@@ -1,3 +1,10 @@
+use std::env;
+
 fn main() {
-    println!("Hello, world!");
+    let args = env::args().skip(1);
+    run(args);
+}
+
+fn run(args: impl Iterator<Item = String>) {
+    args.for_each(|arg| println!("{}", arg));
 }
