@@ -1,10 +1,22 @@
-use std::env;
+use std::error::Error;
+use std::{env, fs};
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     let args = env::args().skip(1);
-    run(args);
+    run(args)?;
+
+    Ok(())
 }
 
-fn run(args: impl Iterator<Item = String>) {
-    args.for_each(|arg| println!("{}", arg));
+fn run(mut args: impl Iterator<Item = String>) -> Result<(), Box<dyn Error>> {
+    let file = args.next().ok_or("File path required")?;
+
+    if args.next().is_some() {
+        return Err("Too many arguments".into());
+    }
+
+    let content = fs::read_to_string(file)?;
+    println!("{}", content);
+
+    Ok(())
 }
