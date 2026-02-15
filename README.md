@@ -47,6 +47,18 @@ By default, it generates a flowchart and writes Mermaid text to standard output.
 arazzo2mermaid arazzo.yml
 ```
 
+Read from standard input instead of a file:
+
+```sh
+cat arazzo.yml | arazzo2mermaid
+```
+
+Use `-` to explicitly read from stdin.
+
+```sh
+arazzo2mermaid -
+```
+
 Save to a file:
 
 ```sh
