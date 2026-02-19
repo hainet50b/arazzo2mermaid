@@ -3,3 +3,7 @@
 
 # IDEs
 .idea/
+
+# Claude Code
+.claude/
+

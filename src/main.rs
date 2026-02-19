@@ -1,6 +1,27 @@
 use std::error::Error;
 use std::{env, fs, io};
 use std::io::Read;
+use serde::Deserialize;
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ArazzoDocument {
+    workflows: Vec<Workflow>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Workflow {
+    workflow_id: String,
+    summary: Option<String>,
+    steps: Vec<Step>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Step {
+    step_id: String,
+}
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = env::args().skip(1);
@@ -24,6 +45,8 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<(), Box<dyn Error>> {
     let mut content = String::new();
     reader.read_to_string(&mut content)?;
 
-    println!("{}", content);
+    let document: ArazzoDocument = yaml_serde::from_str(&content)?;
+
+    println!("{document:#?}");
     Ok(())
 }

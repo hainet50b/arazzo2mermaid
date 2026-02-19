@@ -1,0 +1,53 @@
+arazzo: 1.0.1
+
+info:
+  title: Credit Card API Workflows
+  summary: Provides workflow to use Credit Card API.
+  version: 1.0.0
+
+sourceDescriptions:
+  - name: creditCardApi
+    url: ./openapi.yml
+    type: openapi
+
+workflows:
+  - workflowId: authorizeThenCapture
+    summary: Authorize then capture
+    description: Create a card authorization and then capture it.
+
+    inputs:
+      type: object
+      properties:
+        amount:
+          type: number
+          example: 9200
+      required:
+        - amount
+
+    steps:
+      - stepId: createAuthorizationStep
+        description: Create a card authorization.
+        operationId: $sourceDescriptions.creditCardApi.createAuthorization
+        requestBody:
+          contentType: application/json
+          payload:
+            amount: $inputs.amount
+        successCriteria:
+          - condition: $statusCode == 201
+        outputs:
+          authorizationId: $response.body#/id
+          authorizationStatus: $response.body#/status
+
+      - stepId: captureAuthorizationStep
+        description: Capture a card authorization.
+        operationId: $sourceDescriptions.creditCardApi.captureAuthorization
+        requestBody:
+          contentType: application/json
+          payload:
+            authorization_id: $steps.createAuthorizationStep.outputs.authorizationId
+            amount: $inputs.amount
+        successCriteria:
+          - condition: $statusCode == 201
+        outputs:
+          captureId: $response.body#/id
+          captureStatus: $response.body#/status
