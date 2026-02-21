@@ -59,15 +59,15 @@ mod tests {
             }],
         };
 
+        let sut = MermaidFlowchart;
+
+        let actual = sut.render(&arazzo);
+
         let expected = concat!(
             "flowchart TD\n",
             "    step_foo[description_foo] --> step_bar[description_bar]\n",
             "    step_bar[description_bar] --> step_baz[description_baz]\n",
         );
-
-        let sut = MermaidFlowchart;
-
-        let actual = sut.render(&arazzo);
 
         assert_eq!(expected, actual);
     }
@@ -91,14 +91,14 @@ mod tests {
             }],
         };
 
+        let sut = MermaidFlowchart;
+
+        let actual = sut.render(&arazzo);
+
         let expected = concat!(
             "flowchart TD\n",
             "    step_foo --> step_bar\n",
         );
-
-        let sut = MermaidFlowchart;
-
-        let actual = sut.render(&arazzo);
 
         assert_eq!(expected, actual);
     }
