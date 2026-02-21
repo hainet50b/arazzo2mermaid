@@ -40,8 +40,6 @@ mod tests {
     fn render_steps() {
         let arazzo = ArazzoDocument {
             workflows: vec![Workflow {
-                workflow_id: String::from("workflow"),
-                summary: None,
                 steps: vec![
                     Step {
                         step_id: String::from("step_foo"),
@@ -56,6 +54,7 @@ mod tests {
                         description: Some(String::from("description_baz")),
                     },
                 ],
+                ..Default::default()
             }],
         };
 
@@ -76,18 +75,17 @@ mod tests {
     fn render_steps_without_description() {
         let arazzo = ArazzoDocument {
             workflows: vec![Workflow {
-                workflow_id: String::from("workflow"),
-                summary: None,
                 steps: vec![
                     Step {
                         step_id: String::from("step_foo"),
-                        description: None,
+                        ..Default::default()
                     },
                     Step {
                         step_id: String::from("step_bar"),
-                        description: None,
+                        ..Default::default()
                     },
                 ],
+                ..Default::default()
             }],
         };
 
