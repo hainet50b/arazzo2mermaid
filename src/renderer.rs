@@ -15,11 +15,11 @@ impl Renderer for MermaidFlowchart {
                 let from = &pair[0];
                 let to = &pair[1];
                 output.push_str(&format!(
-                    "    {}[{}] --> {}[{}]\n",
+                    "    {}{} --> {}{}\n",
                     from.step_id,
-                    from.description.as_deref().unwrap_or(""),
+                    node_label(&from),
                     to.step_id,
-                    to.description.as_deref().unwrap_or(""),
+                    node_label(&to),
                 ));
             }
         }
@@ -28,12 +28,16 @@ impl Renderer for MermaidFlowchart {
     }
 }
 
+fn node_label(step: &Step) -> String {
+    step.description.as_ref().map_or(String::from(""), |v| format!("[{}]", v))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn render_steps_in_flowchart_manner() {
+    fn render_steps() {
         let arazzo = ArazzoDocument {
             workflows: vec![Workflow {
                 workflow_id: String::from("workflow"),
@@ -59,6 +63,37 @@ mod tests {
             "flowchart TD\n",
             "    step_foo[description_foo] --> step_bar[description_bar]\n",
             "    step_bar[description_bar] --> step_baz[description_baz]\n",
+        );
+
+        let sut = MermaidFlowchart;
+
+        let actual = sut.render(&arazzo);
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn render_steps_without_description() {
+        let arazzo = ArazzoDocument {
+            workflows: vec![Workflow {
+                workflow_id: String::from("workflow"),
+                summary: None,
+                steps: vec![
+                    Step {
+                        step_id: String::from("step_foo"),
+                        description: None,
+                    },
+                    Step {
+                        step_id: String::from("step_bar"),
+                        description: None,
+                    },
+                ],
+            }],
+        };
+
+        let expected = concat!(
+            "flowchart TD\n",
+            "    step_foo --> step_bar\n",
         );
 
         let sut = MermaidFlowchart;
