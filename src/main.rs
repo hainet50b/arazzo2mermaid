@@ -1,11 +1,11 @@
-use std::error::Error;
-use std::{env, fs, io};
-use std::io::Read;
-use crate::renderer::{Renderer, MermaidFlowchart};
 use crate::arazzo::ArazzoDocument;
+use crate::renderer::{MermaidFlowchart, Renderer};
+use std::error::Error;
+use std::io::Read;
+use std::{env, fs, io};
 
-mod renderer;
 mod arazzo;
+mod renderer;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = env::args().skip(1);
@@ -35,4 +35,3 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
-

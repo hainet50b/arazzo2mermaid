@@ -1,4 +1,4 @@
-use crate::arazzo::{ArazzoDocument, Workflow, Step};
+use crate::arazzo::{ArazzoDocument, Step, Workflow};
 
 pub trait Renderer {
     fn render(&self, document: &ArazzoDocument) -> String;
@@ -29,17 +29,21 @@ mod tests {
     #[test]
     fn render_steps_in_flowchart_manner() {
         let arazzo = ArazzoDocument {
-            workflows: vec![
-                Workflow {
-                    workflow_id: String::from("workflow"),
-                    summary: None,
-                    steps: vec![
-                        Step { step_id: String::from("step_foo") },
-                        Step { step_id: String::from("step_bar") },
-                        Step { step_id: String::from("step_baz") },
-                    ]
-                },
-            ]
+            workflows: vec![Workflow {
+                workflow_id: String::from("workflow"),
+                summary: None,
+                steps: vec![
+                    Step {
+                        step_id: String::from("step_foo"),
+                    },
+                    Step {
+                        step_id: String::from("step_bar"),
+                    },
+                    Step {
+                        step_id: String::from("step_baz"),
+                    },
+                ],
+            }],
         };
 
         let expected = concat!(
@@ -55,4 +59,3 @@ mod tests {
         assert_eq!(expected, actual);
     }
 }
-

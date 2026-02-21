@@ -19,4 +19,3 @@ pub struct Workflow {
 pub struct Step {
     pub step_id: String,
 }
-
