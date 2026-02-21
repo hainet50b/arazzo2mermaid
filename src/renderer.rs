@@ -12,9 +12,15 @@ impl Renderer for MermaidFlowchart {
 
         for workflow in &document.workflows {
             for pair in workflow.steps.windows(2) {
-                let from = &pair[0].step_id;
-                let to = &pair[1].step_id;
-                output.push_str(&format!("    {from} --> {to}\n"));
+                let from = &pair[0];
+                let to = &pair[1];
+                output.push_str(&format!(
+                    "    {}[{}] --> {}[{}]\n",
+                    from.step_id,
+                    from.description.as_deref().unwrap_or(""),
+                    to.step_id,
+                    to.description.as_deref().unwrap_or(""),
+                ));
             }
         }
 
@@ -35,12 +41,15 @@ mod tests {
                 steps: vec![
                     Step {
                         step_id: String::from("step_foo"),
+                        description: Some(String::from("description_foo")),
                     },
                     Step {
                         step_id: String::from("step_bar"),
+                        description: Some(String::from("description_bar")),
                     },
                     Step {
                         step_id: String::from("step_baz"),
+                        description: Some(String::from("description_baz")),
                     },
                 ],
             }],
@@ -48,8 +57,8 @@ mod tests {
 
         let expected = concat!(
             "flowchart TD\n",
-            "    step_foo --> step_bar\n",
-            "    step_bar --> step_baz\n",
+            "    step_foo[description_foo] --> step_bar[description_bar]\n",
+            "    step_bar[description_bar] --> step_baz[description_baz]\n",
         );
 
         let sut = MermaidFlowchart;

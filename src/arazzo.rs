@@ -18,4 +18,5 @@ pub struct Workflow {
 #[serde(rename_all = "camelCase")]
 pub struct Step {
     pub step_id: String,
+    pub description: Option<String>,
 }
