@@ -34,6 +34,14 @@ workflows:
             amount: $inputs.amount
         successCriteria:
           - condition: $statusCode == 201
+        onSuccess:
+          - name: proceedToCaptureAuthorizationStep
+            type: goto
+            stepId: captureAuthorizationStep
+        onFailure:
+          - name: createAuthorizationStepFailure
+            type: goto
+            stepId: reverseAuthorizationStep
         outputs:
           authorizationId: $response.body#/id
           authorizationStatus: $response.body#/status
@@ -48,6 +56,32 @@ workflows:
             amount: $inputs.amount
         successCriteria:
           - condition: $statusCode == 201
+        onSuccess:
+          - name: done
+            type: end
+        onFailure:
+          - name: captureAuthorizationStepFailure
+            type: goto
+            stepId: reverseAuthorizationStep
         outputs:
           captureId: $response.body#/id
           captureStatus: $response.body#/status
+
+      - stepId: reverseAuthorizationStep
+        description: Reverse a card authorization.
+        operationId: $sourceDescriptions.creditCardApi.reverseAuthorization
+        requestBody:
+          contentType: application/json
+          payload:
+            authorization_id: $steps.createAuthorizationStep.outputs.authorizationId
+        successCriteria:
+          - condition: $statusCode == 201
+        onSuccess:
+          - name: done
+            type: end
+        onFailure:
+          - name: done
+            type: end
+        outputs:
+          reversalId: $response.body#/id
+          reversalStatus: $response.body#/status

@@ -1,4 +1,4 @@
-use crate::arazzo::{Action, ArazzoDocument, Step, Workflow};
+use crate::arazzo::{Action, ActionType, ArazzoDocument, Step, Workflow};
 
 pub trait Renderer {
     fn render(&self, document: &ArazzoDocument) -> String;
@@ -67,7 +67,7 @@ fn lookup_goto_actions(step: &Step, verdict: Verdict) -> Option<Vec<&Action>> {
 
     actions.map(|vec| {
         vec.into_iter()
-            .filter(|a| a.action_type == "goto")
+            .filter(|a| a.action_type == ActionType::Goto)
             .collect::<Vec<_>>()
     })
 }
@@ -156,6 +156,7 @@ mod tests {
             },
             workflows: vec![Workflow {
                 workflow_id: String::from("workflowFoo"),
+                description: Some(String::from("Workflow foo's description.")),
                 steps: vec![
                     Step {
                         step_id: String::from("stepFoo"),
@@ -164,11 +165,11 @@ mod tests {
                             condition: Some(String::from("$statusCode == 200")),
                         }]),
                         on_success: Some(vec![Action {
-                            action_type: String::from("goto"),
+                            action_type: ActionType::Goto,
                             step_id: Some(String::from("stepBar")),
                         }]),
                         on_failure: Some(vec![Action {
-                            action_type: String::from("goto"),
+                            action_type: ActionType::Goto,
                             step_id: Some(String::from("stepBaz")),
                         }]),
                     },
@@ -179,11 +180,11 @@ mod tests {
                             condition: Some(String::from("$statusCode == 200")),
                         }]),
                         on_success: Some(vec![Action {
-                            action_type: String::from("end"),
-                            ..Default::default()
+                            action_type: ActionType::End,
+                            step_id: None,
                         }]),
                         on_failure: Some(vec![Action {
-                            action_type: String::from("goto"),
+                            action_type: ActionType::Goto,
                             step_id: Some(String::from("stepBaz")),
                         }]),
                     },
@@ -194,16 +195,15 @@ mod tests {
                             condition: Some(String::from("$statusCode == 200")),
                         }]),
                         on_success: Some(vec![Action {
-                            action_type: String::from("end"),
-                            ..Default::default()
+                            action_type: ActionType::End,
+                            step_id: None,
                         }]),
                         on_failure: Some(vec![Action {
-                            action_type: String::from("end"),
-                            ..Default::default()
+                            action_type: ActionType::End,
+                            step_id: None,
                         }]),
                     },
                 ],
-                ..Default::default()
             }],
         };
 
@@ -216,7 +216,7 @@ mod tests {
             "title: Workflows\n",
             "---\n",
             "flowchart TD\n",
-            "    subgraph workflowFoo\n",
+            "    subgraph workflowFoo[\"Workflow foo's description.\"]\n",
             "    stepFoo[\"Step foo's description.\"] --> stepFooNode{$statusCode == 200}\n",
             "    stepFooNode{$statusCode == 200} -->|true| stepBar\n",
             "    stepFooNode{$statusCode == 200} -->|false| stepBaz\n",
@@ -236,17 +236,23 @@ mod tests {
             },
             workflows: vec![Workflow {
                 workflow_id: String::from("workflow_foo"),
+                description: None,
                 steps: vec![
                     Step {
                         step_id: String::from("step_foo"),
-                        ..Default::default()
+                        description: None,
+                        success_criteria: None,
+                        on_success: None,
+                        on_failure: None,
                     },
                     Step {
                         step_id: String::from("step_bar"),
-                        ..Default::default()
+                        description: None,
+                        success_criteria: None,
+                        on_success: None,
+                        on_failure: None,
                     },
                 ],
-                ..Default::default()
             }],
         };
 

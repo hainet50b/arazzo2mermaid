@@ -1,19 +1,19 @@
 use serde::Deserialize;
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ArazzoDocument {
     pub info: Info,
     pub workflows: Vec<Workflow>,
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Info {
     pub title: String,
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Workflow {
     pub workflow_id: String,
@@ -21,7 +21,7 @@ pub struct Workflow {
     pub steps: Vec<Step>,
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Step {
     pub step_id: String,
@@ -31,16 +31,23 @@ pub struct Step {
     pub on_failure: Option<Vec<Action>>,
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Criteria {
     pub condition: Option<String>,
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Action {
     #[serde(rename = "type")]
-    pub action_type: String,
+    pub action_type: ActionType,
     pub step_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum ActionType {
+    Goto,
+    End,
 }
