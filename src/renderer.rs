@@ -18,25 +18,16 @@ impl Renderer for MermaidFlowchart {
                 if has_goto_actions(current_step) {
                     output.push_str(&to_rhombus_from_rectangle(current_step));
 
-                    if let Some(actions) = lookup_goto_actions(current_step, Verdict::Ok) {
-                        for action in actions {
-                            if let Some(action_step_id) = &action.step_id {
-                                output.push_str(&to_rectangle_from_rhombus(
-                                    current_step,
-                                    Verdict::Ok,
-                                    action_step_id,
-                                ));
-                            }
-                        }
-                    }
-                    if let Some(actions) = lookup_goto_actions(current_step, Verdict::Ng) {
-                        for action in actions {
-                            if let Some(action_step_id) = &action.step_id {
-                                output.push_str(&to_rectangle_from_rhombus(
-                                    current_step,
-                                    Verdict::Ng,
-                                    action_step_id,
-                                ));
+                    for verdict in [Verdict::Ok, Verdict::Ng] {
+                        if let Some(actions) = lookup_goto_actions(current_step, verdict) {
+                            for action in actions {
+                                if let Some(action_step_id) = &action.step_id {
+                                    output.push_str(&to_rectangle_from_rhombus(
+                                        current_step,
+                                        verdict,
+                                        action_step_id,
+                                    ));
+                                }
                             }
                         }
                     }
@@ -103,6 +94,7 @@ fn to_rectangle_from_rectangle(from: &Step, to: &Step) -> String {
     )
 }
 
+#[derive(Clone, Copy)]
 enum Verdict {
     Ok,
     Ng,
