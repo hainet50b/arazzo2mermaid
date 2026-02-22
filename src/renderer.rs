@@ -37,7 +37,7 @@ fn title(workflow: &Workflow) -> String {
 }
 
 fn node_label(step: &Step) -> String {
-    step.description.as_ref().map_or(String::from(""), |v| format!("[{}]", v))
+    step.description.as_ref().map_or(String::from(""), |v| format!("[\"{}\"]", v))
 }
 
 #[cfg(test)]
@@ -76,8 +76,8 @@ mod tests {
             "title: workflow_a\n",
             "---\n",
             "flowchart TD\n",
-            "    step_foo[description_foo] --> step_bar[description_bar]\n",
-            "    step_bar[description_bar] --> step_baz[description_baz]\n",
+            "    step_foo[\"description_foo\"] --> step_bar[\"description_bar\"]\n",
+            "    step_bar[\"description_bar\"] --> step_baz[\"description_baz\"]\n",
         );
 
         assert_eq!(expected, actual);
