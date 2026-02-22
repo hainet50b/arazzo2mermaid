@@ -55,45 +55,6 @@ fn lookup_goto_actions(step: &Step, verdict: Verdict) -> Option<Vec<&Action>> {
     })
 }
 
-fn to_rhombus_from_rectangle(step: &Step) -> String {
-    format!(
-        "    {}{} --> {}{}\n",
-        step.step_id,
-        node_label(step),
-        middle_node(step),
-        condition(step),
-    )
-}
-
-fn to_rectangle_from_rhombus(step: &Step, verdict: Verdict, step_id: &str) -> String {
-    format!(
-        "    {}{} -->|{}| {}\n",
-        middle_node(step),
-        condition(step),
-        match verdict {
-            Verdict::Ok => "true",
-            Verdict::Ng => "false",
-        },
-        step_id,
-    )
-}
-
-fn to_rectangle_from_rectangle(from: &Step, to: &Step) -> String {
-    format!(
-        "    {}{} --> {}{}\n",
-        from.step_id,
-        node_label(from),
-        to.step_id,
-        node_label(to),
-    )
-}
-
-#[derive(Clone, Copy)]
-enum Verdict {
-    Ok,
-    Ng,
-}
-
 fn title(arazzo: &ArazzoDocument) -> String {
     format!("---\ntitle: {}\n---\n", arazzo.info.title)
 }
@@ -109,12 +70,46 @@ fn subgraph(workflow: &Workflow) -> String {
     )
 }
 
-fn condition(step: &Step) -> String {
-    step.success_criteria
-        .as_ref()
-        .and_then(|cs| cs.first())
-        .and_then(|c| c.condition.as_ref())
-        .map_or(String::from(""), |v| format!("{{{}}}", v))
+fn to_rhombus_from_rectangle(step: &Step) -> String {
+    format!(
+        "    {rectangle_node} --> {rhombus_node}\n",
+        rectangle_node = rectangle_node(step),
+        rhombus_node = rhombus_node(step),
+    )
+}
+
+fn to_rectangle_from_rhombus(step: &Step, verdict: Verdict, step_id: &str) -> String {
+    format!(
+        "    {rhombus_node} -->|{verdict}| {rectangle_node}\n",
+        rhombus_node = rhombus_node(step),
+        verdict = match verdict {
+            Verdict::Ok => "true",
+            Verdict::Ng => "false",
+        },
+        rectangle_node = step_id,
+    )
+}
+
+fn to_rectangle_from_rectangle(from: &Step, to: &Step) -> String {
+    format!(
+        "    {from_node} --> {to_node}\n",
+        from_node = rectangle_node(from),
+        to_node = rectangle_node(to),
+    )
+}
+
+#[derive(Clone, Copy)]
+enum Verdict {
+    Ok,
+    Ng,
+}
+
+fn rectangle_node(step: &Step) -> String {
+    format!(
+        "{node_name}{node_label}",
+        node_name = step.step_id,
+        node_label = node_label(step),
+    )
 }
 
 fn node_label(step: &Step) -> String {
@@ -123,8 +118,20 @@ fn node_label(step: &Step) -> String {
         .map_or(String::from(""), |v| format!("[\"{}\"]", v))
 }
 
-fn middle_node(step: &Step) -> String {
-    format!("{}Node", step.step_id)
+fn rhombus_node(step: &Step) -> String {
+    format!(
+        "{node_name}Node{condition}",
+        node_name = step.step_id,
+        condition = condition(step),
+    )
+}
+
+fn condition(step: &Step) -> String {
+    step.success_criteria
+        .as_ref()
+        .and_then(|cs| cs.first())
+        .and_then(|c| c.condition.as_ref())
+        .map_or(String::from(""), |v| format!("{{{}}}", v))
 }
 
 #[cfg(test)]
