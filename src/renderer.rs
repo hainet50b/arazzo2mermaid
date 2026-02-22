@@ -19,14 +19,28 @@ impl Renderer for MermaidFlowchart {
                     output.push_str(&to_rhombus_from_rectangle(current_step));
 
                     [Verdict::Ok, Verdict::Ng].iter()
-                        .filter_map(|&v| lookup_goto_actions(current_step, v).map(|a| (v, a)))
-                        .flat_map(|(v, actions)| actions.into_iter().map(move |a| (v, a)))
-                        .filter_map(|(v, action)| action.step_id.as_ref().map(|id| (v, id)))
-                        .for_each(|(v, id)| {
-                            output.push_str(&to_rectangle_from_rhombus(current_step, v, id))
-                        });
+                        .filter_map(|&v| lookup_actions(current_step, v).map(|a| (v, a)))
+                        .flat_map(|(v, actions)| actions.iter().map(move |a| (v, a)))
+                        .for_each(|(v, a)| {
+                            match a.action_type {
+                                ActionType::Goto => {
+                                    if let Some(step_id) = &a.step_id {
+                                        output.push_str(&to_rectangle_from_rhombus(
+                                            current_step,
+                                            v,
+                                            step_id,
+                                        ));
+                                    }
+                                },
+                                ActionType::End => {
+                                    output.push_str(&to_end_from_rhombus(current_step, v, workflow));
+                                }
+                            }
+                        })
                 } else if let Some(next_step) = &workflow.steps.get(i + 1) {
                     output.push_str(&to_rectangle_from_rectangle(current_step, next_step));
+                } else {
+                    output.push_str(&to_end_from_rectangle(current_step, workflow));
                 }
             }
 
@@ -38,21 +52,17 @@ impl Renderer for MermaidFlowchart {
 }
 
 fn has_goto_actions(step: &Step) -> bool {
-    lookup_goto_actions(step, Verdict::Ok).is_some_and(|a| !a.is_empty())
-        || lookup_goto_actions(step, Verdict::Ng).is_some_and(|a| !a.is_empty())
+    [Verdict::Ok, Verdict::Ng].iter()
+        .filter_map(|&v| lookup_actions(step, v))
+        .flat_map(|actions| actions.iter())
+        .any(|a| a.action_type == ActionType::Goto)
 }
 
-fn lookup_goto_actions(step: &Step, verdict: Verdict) -> Option<Vec<&Action>> {
-    let actions = match verdict {
+fn lookup_actions(step: &Step, verdict: Verdict) -> Option<&Vec<Action>> {
+    match verdict {
         Verdict::Ok => step.on_success.as_ref(),
         Verdict::Ng => step.on_failure.as_ref(),
-    };
-
-    actions.map(|vec| {
-        vec.iter()
-            .filter(|a| a.action_type == ActionType::Goto)
-            .collect::<Vec<_>>()
-    })
+    }
 }
 
 fn title(arazzo: &ArazzoDocument) -> String {
@@ -98,6 +108,26 @@ fn to_rectangle_from_rectangle(from: &Step, to: &Step) -> String {
     )
 }
 
+fn to_end_from_rectangle(step: &Step, workflow: &Workflow) -> String {
+    format!(
+        "    {rectangle_node} --> {end_node}\n",
+        rectangle_node = rectangle_node(step),
+        end_node = end_node(workflow),
+    )
+}
+
+fn to_end_from_rhombus(step: &Step, verdict: Verdict, workflow: &Workflow) -> String {
+    format!(
+        "    {rhombus_node} -->|{verdict}| {end_node}\n",
+        rhombus_node = rhombus_node(step),
+        verdict = match verdict {
+            Verdict::Ok => "true",
+            Verdict::Ng => "false",
+        },
+        end_node = end_node(workflow),
+    )
+}
+
 #[derive(Clone, Copy)]
 enum Verdict {
     Ok,
@@ -132,6 +162,10 @@ fn condition(step: &Step) -> String {
         .and_then(|cs| cs.first())
         .and_then(|c| c.condition.as_ref())
         .map_or(String::from(""), |v| format!("{{{}}}", v))
+}
+
+fn end_node(workflow: &Workflow) -> String {
+    format!("{}EndNode((End))", workflow.workflow_id)
 }
 
 #[cfg(test)]
@@ -180,8 +214,8 @@ mod tests {
                         }]),
                     },
                     Step {
-                        step_id: String::from("step_baz"),
-                        description: Some(String::from("description_baz")),
+                        step_id: String::from("stepBaz"),
+                        description: Some(String::from("Step baz's description.")),
                         success_criteria: Some(vec![Criteria {
                             condition: Some(String::from("$statusCode == 200")),
                         }]),
@@ -212,7 +246,9 @@ mod tests {
             "    stepFooNode{$statusCode == 200} -->|true| stepBar\n",
             "    stepFooNode{$statusCode == 200} -->|false| stepBaz\n",
             "    stepBar[\"Step bar's description.\"] --> stepBarNode{$statusCode == 200}\n",
+            "    stepBarNode{$statusCode == 200} -->|true| workflowFooEndNode((End))\n",
             "    stepBarNode{$statusCode == 200} -->|false| stepBaz\n",
+            "    stepBaz[\"Step baz's description.\"] --> workflowFooEndNode((End))\n",
             "    end\n",
         );
 
@@ -223,21 +259,21 @@ mod tests {
     fn render_steps_without_description() {
         let arazzo = ArazzoDocument {
             info: Info {
-                title: String::from("workflows"),
+                title: String::from("Workflows"),
             },
             workflows: vec![Workflow {
-                workflow_id: String::from("workflow_foo"),
+                workflow_id: String::from("workflowFoo"),
                 description: None,
                 steps: vec![
                     Step {
-                        step_id: String::from("step_foo"),
+                        step_id: String::from("stepFoo"),
                         description: None,
                         success_criteria: None,
                         on_success: None,
                         on_failure: None,
                     },
                     Step {
-                        step_id: String::from("step_bar"),
+                        step_id: String::from("stepBar"),
                         description: None,
                         success_criteria: None,
                         on_success: None,
@@ -253,11 +289,12 @@ mod tests {
 
         let expected = concat!(
             "---\n",
-            "title: workflows\n",
+            "title: Workflows\n",
             "---\n",
             "flowchart TD\n",
-            "    subgraph workflow_foo\n",
-            "    step_foo --> step_bar\n",
+            "    subgraph workflowFoo\n",
+            "    stepFoo --> stepBar\n",
+            "    stepBar --> workflowFooEndNode((End))\n",
             "    end\n",
         );
 
