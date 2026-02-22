@@ -18,19 +18,13 @@ impl Renderer for MermaidFlowchart {
                 if has_goto_actions(current_step) {
                     output.push_str(&to_rhombus_from_rectangle(current_step));
 
-                    for verdict in [Verdict::Ok, Verdict::Ng] {
-                        if let Some(actions) = lookup_goto_actions(current_step, verdict) {
-                            for action in actions {
-                                if let Some(action_step_id) = &action.step_id {
-                                    output.push_str(&to_rectangle_from_rhombus(
-                                        current_step,
-                                        verdict,
-                                        action_step_id,
-                                    ));
-                                }
-                            }
-                        }
-                    }
+                    [Verdict::Ok, Verdict::Ng].iter()
+                        .filter_map(|&v| lookup_goto_actions(current_step, v).map(|a| (v, a)))
+                        .flat_map(|(v, actions)| actions.into_iter().map(move |a| (v, a)))
+                        .filter_map(|(v, action)| action.step_id.as_ref().map(|id| (v, id)))
+                        .for_each(|(v, id)| {
+                            output.push_str(&to_rectangle_from_rhombus(current_step, v, id))
+                        });
                 } else if let Some(next_step) = &workflow.steps.get(i + 1) {
                     output.push_str(&to_rectangle_from_rectangle(current_step, next_step));
                 }
