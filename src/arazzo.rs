@@ -17,6 +17,7 @@ pub struct Info {
 #[serde(rename_all = "camelCase")]
 pub struct Workflow {
     pub workflow_id: String,
+    pub description: Option<String>,
     pub steps: Vec<Step>,
 }
 
@@ -25,4 +26,21 @@ pub struct Workflow {
 pub struct Step {
     pub step_id: String,
     pub description: Option<String>,
+    pub success_criteria: Option<Vec<Criteria>>,
+    pub on_success: Option<Vec<Action>>,
+    pub on_failure: Option<Vec<Action>>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Criteria {
+    pub condition: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Action {
+    #[serde(rename = "type")]
+    pub action_type: String,
+    pub step_id: Option<String>,
 }
