@@ -3,14 +3,20 @@ use serde::Deserialize;
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ArazzoDocument {
+    pub info: Info,
     pub workflows: Vec<Workflow>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Info {
+    pub title: String,
 }
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Workflow {
     pub workflow_id: String,
-    pub summary: Option<String>,
     pub steps: Vec<Step>,
 }
 
