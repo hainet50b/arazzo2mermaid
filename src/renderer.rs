@@ -8,42 +8,40 @@ pub struct MermaidFlowchart;
 
 impl Renderer for MermaidFlowchart {
     fn render(&self, arazzo: &ArazzoDocument) -> String {
-        let mut output = title(&arazzo);
+        let mut output = title(arazzo);
         output.push_str("flowchart TD\n");
 
         for workflow in &arazzo.workflows {
-            output.push_str(&subgraph(&workflow));
+            output.push_str(&subgraph(workflow));
 
             for (i, current_step) in workflow.steps.iter().enumerate() {
-                if has_goto_actions(&current_step) {
-                    output.push_str(&to_rhombus_from_rectangle(&current_step));
+                if has_goto_actions(current_step) {
+                    output.push_str(&to_rhombus_from_rectangle(current_step));
 
-                    if let Some(actions) = lookup_goto_actions(&current_step, Verdict::Ok) {
+                    if let Some(actions) = lookup_goto_actions(current_step, Verdict::Ok) {
                         for action in actions {
                             if let Some(action_step_id) = &action.step_id {
                                 output.push_str(&to_rectangle_from_rhombus(
-                                    &current_step,
+                                    current_step,
                                     Verdict::Ok,
                                     action_step_id,
                                 ));
                             }
                         }
                     }
-                    if let Some(actions) = lookup_goto_actions(&current_step, Verdict::Ng) {
+                    if let Some(actions) = lookup_goto_actions(current_step, Verdict::Ng) {
                         for action in actions {
                             if let Some(action_step_id) = &action.step_id {
                                 output.push_str(&to_rectangle_from_rhombus(
-                                    &current_step,
+                                    current_step,
                                     Verdict::Ng,
                                     action_step_id,
                                 ));
                             }
                         }
                     }
-                } else {
-                    if let Some(next_step) = &workflow.steps.get(i + 1) {
-                        output.push_str(&to_rectangle_from_rectangle(&current_step, &next_step));
-                    }
+                } else if let Some(next_step) = &workflow.steps.get(i + 1) {
+                    output.push_str(&to_rectangle_from_rectangle(current_step, next_step));
                 }
             }
 
@@ -55,8 +53,8 @@ impl Renderer for MermaidFlowchart {
 }
 
 fn has_goto_actions(step: &Step) -> bool {
-    lookup_goto_actions(&step, Verdict::Ok).is_some_and(|a| !a.is_empty())
-        || lookup_goto_actions(&step, Verdict::Ng).is_some_and(|a| !a.is_empty())
+    lookup_goto_actions(step, Verdict::Ok).is_some_and(|a| !a.is_empty())
+        || lookup_goto_actions(step, Verdict::Ng).is_some_and(|a| !a.is_empty())
 }
 
 fn lookup_goto_actions(step: &Step, verdict: Verdict) -> Option<Vec<&Action>> {
@@ -66,7 +64,7 @@ fn lookup_goto_actions(step: &Step, verdict: Verdict) -> Option<Vec<&Action>> {
     };
 
     actions.map(|vec| {
-        vec.into_iter()
+        vec.iter()
             .filter(|a| a.action_type == ActionType::Goto)
             .collect::<Vec<_>>()
     })
@@ -76,17 +74,17 @@ fn to_rhombus_from_rectangle(step: &Step) -> String {
     format!(
         "    {}{} --> {}{}\n",
         step.step_id,
-        node_label(&step),
-        middle_node(&step),
-        condition(&step),
+        node_label(step),
+        middle_node(step),
+        condition(step),
     )
 }
 
 fn to_rectangle_from_rhombus(step: &Step, verdict: Verdict, step_id: &str) -> String {
     format!(
         "    {}{} -->|{}| {}\n",
-        middle_node(&step),
-        condition(&step),
+        middle_node(step),
+        condition(step),
         match verdict {
             Verdict::Ok => "true",
             Verdict::Ng => "false",
@@ -99,9 +97,9 @@ fn to_rectangle_from_rectangle(from: &Step, to: &Step) -> String {
     format!(
         "    {}{} --> {}{}\n",
         from.step_id,
-        node_label(&from),
+        node_label(from),
         to.step_id,
-        node_label(&to),
+        node_label(to),
     )
 }
 
