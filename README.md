@@ -9,7 +9,8 @@ A lightweight Rust CLI tool that converts Arazzo workflows into Mermaid diagrams
 
 `arazzo2mermaid` converts Arazzo workflows into Mermaid diagrams for documentation and visualization.
 
-The Arazzo ecosystem is still evolving, and dedicated visualization tools are limited. This tool is intended as a bridge to connect Arazzo to the existing Mermaid ecosystem until more dedicated tooling matures.
+The Arazzo ecosystem is still evolving, and dedicated visualization tools are limited. This tool is intended as a bridge
+to connect Arazzo to the existing Mermaid ecosystem until more dedicated tooling matures.
 
 ## Features
 
@@ -61,3 +62,32 @@ Save to a file:
 arazzo2mermaid arazzo.yml -o docs/flowchart.mmd
 ```
 
+## Conversion Rules
+
+### Step connections
+
+Steps are connected sequentially by default. When `onSuccess` or `onFailure` actions are defined, they override the
+default sequential flow.
+
+| successCriteria | onSuccess | onFailure | Rendering                                                                                                |
+|-----------------|-----------|-----------|----------------------------------------------------------------------------------------------------------|
+| Defined         | Defined   | Defined   | Rhombus node with condition label. `true` and `false` edges follow the specified actions.                |
+| Defined         | Defined   | Omitted   | Rhombus node with condition label. `true` edge follows onSuccess. `false` edge goes to End.              |
+| Defined         | Omitted   | Defined   | Rhombus node with condition label. `true` edge goes to the next step. `false` edge follows onFailure.    |
+| Defined         | Omitted   | Omitted   | Rhombus node with condition label. `true` edge goes to the next step. `false` edge goes to End.          |
+| Omitted         | Defined   | Defined   | Rhombus node without condition label. `true` and `false` edges follow the specified actions.             |
+| Omitted         | Defined   | Omitted   | Rhombus node without condition label. `true` edge follows onSuccess. `false` edge goes to End.           |
+| Omitted         | Omitted   | Defined   | Rhombus node without condition label. `true` edge goes to the next step. `false` edge follows onFailure. |
+| Omitted         | Omitted   | Omitted   | Rectangle node connected to the next step, or End if it is the last step.                                |
+
+### Node shapes
+
+| Shape                   | Meaning                                   |
+|-------------------------|-------------------------------------------|
+| Rectangle (`[label]`)   | A workflow step                           |
+| Rhombus (`{condition}`) | A decision point based on successCriteria |
+| Circle (`((End))`)      | End of the workflow                       |
+
+### Defaults from the Arazzo specification
+
+When `onSuccess` is omitted, the next sequential step is executed. When `onFailure` is omitted, the workflow breaks and returns (treated as End in the diagram). These defaults follow the [Arazzo Specification v1.0.1](https://spec.openapis.org/arazzo/latest.html).
