@@ -451,4 +451,458 @@ mod tests {
 
         assert_eq!(expected, actual);
     }
+
+    #[test]
+    #[ignore]
+    fn render_success_criteria_defined_on_success_defined_on_failure_defined() {
+        let arazzo = ArazzoDocument {
+            info: Info {
+                title: String::from("Workflows"),
+            },
+            workflows: vec![Workflow {
+                workflow_id: String::from("workflowFoo"),
+                description: None,
+                steps: vec![
+                    Step {
+                        step_id: String::from("stepFoo"),
+                        description: None,
+                        success_criteria: Some(vec![Criteria {
+                            condition: Some(String::from("$statusCode == 200")),
+                        }]),
+                        on_success: Some(vec![Action {
+                            action_type: ActionType::Goto,
+                            step_id: Some(String::from("stepBar")),
+                        }]),
+                        on_failure: Some(vec![Action {
+                            action_type: ActionType::Goto,
+                            step_id: Some(String::from("stepBaz")),
+                        }]),
+                    },
+                    Step {
+                        step_id: String::from("stepBar"),
+                        description: None,
+                        success_criteria: None,
+                        on_success: None,
+                        on_failure: None,
+                    },
+                    Step {
+                        step_id: String::from("stepBaz"),
+                        description: None,
+                        success_criteria: None,
+                        on_success: None,
+                        on_failure: None,
+                    },
+                ],
+            }],
+        };
+
+        let sut = MermaidFlowchart;
+
+        let actual = sut.render(&arazzo);
+
+        let expected = concat!(
+            "---\n",
+            "title: Workflows\n",
+            "---\n",
+            "flowchart TD\n",
+            "    subgraph workflowFoo\n",
+            "    stepFoo --> stepFooNode{$statusCode == 200}\n",
+            "    stepFooNode{$statusCode == 200} -->|true| stepBar\n",
+            "    stepFooNode{$statusCode == 200} -->|false| stepBaz\n",
+            "    stepBar --> stepBaz\n",
+            "    stepBaz --> workflowFooEndNode((End))\n",
+            "    end\n",
+        );
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    #[ignore]
+    fn render_success_criteria_defined_on_success_defined_on_failure_omitted() {
+        let arazzo = ArazzoDocument {
+            info: Info {
+                title: String::from("Workflows"),
+            },
+            workflows: vec![Workflow {
+                workflow_id: String::from("workflowFoo"),
+                description: None,
+                steps: vec![
+                    Step {
+                        step_id: String::from("stepFoo"),
+                        description: None,
+                        success_criteria: Some(vec![Criteria {
+                            condition: Some(String::from("$statusCode == 200")),
+                        }]),
+                        on_success: Some(vec![Action {
+                            action_type: ActionType::Goto,
+                            step_id: Some(String::from("stepBar")),
+                        }]),
+                        on_failure: None,
+                    },
+                    Step {
+                        step_id: String::from("stepBar"),
+                        description: None,
+                        success_criteria: None,
+                        on_success: None,
+                        on_failure: None,
+                    },
+                ],
+            }],
+        };
+
+        let sut = MermaidFlowchart;
+
+        let actual = sut.render(&arazzo);
+
+        let expected = concat!(
+        "---\n",
+        "title: Workflows\n",
+        "---\n",
+        "flowchart TD\n",
+        "    subgraph workflowFoo\n",
+        "    stepFoo --> stepFooNode{$statusCode == 200}\n",
+        "    stepFooNode{$statusCode == 200} -->|true| stepBar\n",
+        "    stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
+        "    stepBar --> workflowFooEndNode((End))\n",
+        "    end\n",
+        );
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    #[ignore]
+    fn render_success_criteria_defined_on_success_omitted_on_failure_defined() {
+        let arazzo = ArazzoDocument {
+            info: Info {
+                title: String::from("Workflows"),
+            },
+            workflows: vec![Workflow {
+                workflow_id: String::from("workflowFoo"),
+                description: None,
+                steps: vec![
+                    Step {
+                        step_id: String::from("stepFoo"),
+                        description: None,
+                        success_criteria: Some(vec![Criteria {
+                            condition: Some(String::from("$statusCode == 200")),
+                        }]),
+                        on_success: None,
+                        on_failure: Some(vec![Action {
+                            action_type: ActionType::Goto,
+                            step_id: Some(String::from("stepBaz")),
+                        }]),
+                    },
+                    Step {
+                        step_id: String::from("stepBar"),
+                        description: None,
+                        success_criteria: None,
+                        on_success: None,
+                        on_failure: None,
+                    },
+                    Step {
+                        step_id: String::from("stepBaz"),
+                        description: None,
+                        success_criteria: None,
+                        on_success: None,
+                        on_failure: None,
+                    },
+                ],
+            }],
+        };
+
+        let sut = MermaidFlowchart;
+
+        let actual = sut.render(&arazzo);
+
+        let expected = concat!(
+        "---\n",
+        "title: Workflows\n",
+        "---\n",
+        "flowchart TD\n",
+        "    subgraph workflowFoo\n",
+        "    stepFoo --> stepFooNode{$statusCode == 200}\n",
+        "    stepFooNode{$statusCode == 200} -->|true| stepBar\n",
+        "    stepFooNode{$statusCode == 200} -->|false| stepBaz\n",
+        "    stepBar --> stepBaz\n",
+        "    stepBaz --> workflowFooEndNode((End))\n",
+        "    end\n",
+        );
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    #[ignore]
+    fn render_success_criteria_defined_on_success_omitted_on_failure_omitted() {
+        let arazzo = ArazzoDocument {
+            info: Info {
+                title: String::from("Workflows"),
+            },
+            workflows: vec![Workflow {
+                workflow_id: String::from("workflowFoo"),
+                description: None,
+                steps: vec![
+                    Step {
+                        step_id: String::from("stepFoo"),
+                        description: None,
+                        success_criteria: Some(vec![Criteria {
+                            condition: Some(String::from("$statusCode == 200")),
+                        }]),
+                        on_success: None,
+                        on_failure: None,
+                    },
+                    Step {
+                        step_id: String::from("stepBar"),
+                        description: None,
+                        success_criteria: None,
+                        on_success: None,
+                        on_failure: None,
+                    },
+                ],
+            }],
+        };
+
+        let sut = MermaidFlowchart;
+
+        let actual = sut.render(&arazzo);
+
+        let expected = concat!(
+        "---\n",
+        "title: Workflows\n",
+        "---\n",
+        "flowchart TD\n",
+        "    subgraph workflowFoo\n",
+        "    stepFoo --> stepFooNode{$statusCode == 200}\n",
+        "    stepFooNode{$statusCode == 200} -->|true| stepBar\n",
+        "    stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
+        "    stepBar --> workflowFooEndNode((End))\n",
+        "    end\n",
+        );
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    #[ignore]
+    fn render_success_criteria_omitted_on_success_defined_on_failure_defined() {
+        let arazzo = ArazzoDocument {
+            info: Info {
+                title: String::from("Workflows"),
+            },
+            workflows: vec![Workflow {
+                workflow_id: String::from("workflowFoo"),
+                description: None,
+                steps: vec![
+                    Step {
+                        step_id: String::from("stepFoo"),
+                        description: None,
+                        success_criteria: None,
+                        on_success: Some(vec![Action {
+                            action_type: ActionType::Goto,
+                            step_id: Some(String::from("stepBar")),
+                        }]),
+                        on_failure: Some(vec![Action {
+                            action_type: ActionType::Goto,
+                            step_id: Some(String::from("stepBaz")),
+                        }]),
+                    },
+                    Step {
+                        step_id: String::from("stepBar"),
+                        description: None,
+                        success_criteria: None,
+                        on_success: None,
+                        on_failure: None,
+                    },
+                    Step {
+                        step_id: String::from("stepBaz"),
+                        description: None,
+                        success_criteria: None,
+                        on_success: None,
+                        on_failure: None,
+                    },
+                ],
+            }],
+        };
+
+        let sut = MermaidFlowchart;
+
+        let actual = sut.render(&arazzo);
+
+        let expected = concat!(
+        "---\n",
+        "title: Workflows\n",
+        "---\n",
+        "flowchart TD\n",
+        "    subgraph workflowFoo\n",
+        "    stepFoo --> stepFooNode\n",
+        "    stepFooNode -->|true| stepBar\n",
+        "    stepFooNode -->|false| stepBaz\n",
+        "    stepBar --> stepBaz\n",
+        "    stepBaz --> workflowFooEndNode((End))\n",
+        "    end\n",
+        );
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    #[ignore]
+    fn render_success_criteria_omitted_on_success_defined_on_failure_omitted() {
+        let arazzo = ArazzoDocument {
+            info: Info {
+                title: String::from("Workflows"),
+            },
+            workflows: vec![Workflow {
+                workflow_id: String::from("workflowFoo"),
+                description: None,
+                steps: vec![
+                    Step {
+                        step_id: String::from("stepFoo"),
+                        description: None,
+                        success_criteria: None,
+                        on_success: Some(vec![Action {
+                            action_type: ActionType::Goto,
+                            step_id: Some(String::from("stepBar")),
+                        }]),
+                        on_failure: None,
+                    },
+                    Step {
+                        step_id: String::from("stepBar"),
+                        description: None,
+                        success_criteria: None,
+                        on_success: None,
+                        on_failure: None,
+                    },
+                ],
+            }],
+        };
+
+        let sut = MermaidFlowchart;
+
+        let actual = sut.render(&arazzo);
+
+        let expected = concat!(
+        "---\n",
+        "title: Workflows\n",
+        "---\n",
+        "flowchart TD\n",
+        "    subgraph workflowFoo\n",
+        "    stepFoo --> stepFooNode\n",
+        "    stepFooNode -->|true| stepBar\n",
+        "    stepFooNode -->|false| workflowFooEndNode((End))\n",
+        "    stepBar --> workflowFooEndNode((End))\n",
+        "    end\n",
+        );
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    #[ignore]
+    fn render_success_criteria_omitted_on_success_omitted_on_failure_defined() {
+        let arazzo = ArazzoDocument {
+            info: Info {
+                title: String::from("Workflows"),
+            },
+            workflows: vec![Workflow {
+                workflow_id: String::from("workflowFoo"),
+                description: None,
+                steps: vec![
+                    Step {
+                        step_id: String::from("stepFoo"),
+                        description: None,
+                        success_criteria: None,
+                        on_success: None,
+                        on_failure: Some(vec![Action {
+                            action_type: ActionType::Goto,
+                            step_id: Some(String::from("stepBaz")),
+                        }]),
+                    },
+                    Step {
+                        step_id: String::from("stepBar"),
+                        description: None,
+                        success_criteria: None,
+                        on_success: None,
+                        on_failure: None,
+                    },
+                    Step {
+                        step_id: String::from("stepBaz"),
+                        description: None,
+                        success_criteria: None,
+                        on_success: None,
+                        on_failure: None,
+                    },
+                ],
+            }],
+        };
+
+        let sut = MermaidFlowchart;
+
+        let actual = sut.render(&arazzo);
+
+        let expected = concat!(
+        "---\n",
+        "title: Workflows\n",
+        "---\n",
+        "flowchart TD\n",
+        "    subgraph workflowFoo\n",
+        "    stepFoo --> stepFooNode\n",
+        "    stepFooNode -->|true| stepBar\n",
+        "    stepFooNode -->|false| stepBaz\n",
+        "    stepBar --> stepBaz\n",
+        "    stepBaz --> workflowFooEndNode((End))\n",
+        "    end\n",
+        );
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    #[ignore]
+    fn render_success_criteria_omitted_on_success_omitted_on_failure_omitted() {
+        let arazzo = ArazzoDocument {
+            info: Info {
+                title: String::from("Workflows"),
+            },
+            workflows: vec![Workflow {
+                workflow_id: String::from("workflowFoo"),
+                description: None,
+                steps: vec![
+                    Step {
+                        step_id: String::from("stepFoo"),
+                        description: None,
+                        success_criteria: None,
+                        on_success: None,
+                        on_failure: None,
+                    },
+                    Step {
+                        step_id: String::from("stepBar"),
+                        description: None,
+                        success_criteria: None,
+                        on_success: None,
+                        on_failure: None,
+                    },
+                ],
+            }],
+        };
+
+        let sut = MermaidFlowchart;
+
+        let actual = sut.render(&arazzo);
+
+        let expected = concat!(
+        "---\n",
+        "title: Workflows\n",
+        "---\n",
+        "flowchart TD\n",
+        "    subgraph workflowFoo\n",
+        "    stepFoo --> stepBar\n",
+        "    stepBar --> workflowFooEndNode((End))\n",
+        "    end\n",
+        );
+
+        assert_eq!(expected, actual);
+    }
 }
