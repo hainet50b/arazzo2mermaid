@@ -18,23 +18,22 @@ impl Renderer for MermaidFlowchart {
                 if has_goto_actions(current_step) {
                     output.push_str(&to_rhombus_from_rectangle(current_step));
 
-                    [Verdict::Ok, Verdict::Ng].iter()
+                    [Verdict::Ok, Verdict::Ng]
+                        .iter()
                         .filter_map(|&v| lookup_actions(current_step, v).map(|a| (v, a)))
                         .flat_map(|(v, actions)| actions.iter().map(move |a| (v, a)))
-                        .for_each(|(v, a)| {
-                            match a.action_type {
-                                ActionType::Goto => {
-                                    if let Some(step_id) = &a.step_id {
-                                        output.push_str(&to_rectangle_from_rhombus(
-                                            current_step,
-                                            v,
-                                            step_id,
-                                        ));
-                                    }
-                                },
-                                ActionType::End => {
-                                    output.push_str(&to_end_from_rhombus(current_step, v, workflow));
+                        .for_each(|(v, a)| match a.action_type {
+                            ActionType::Goto => {
+                                if let Some(step_id) = &a.step_id {
+                                    output.push_str(&to_rectangle_from_rhombus(
+                                        current_step,
+                                        v,
+                                        step_id,
+                                    ));
                                 }
+                            }
+                            ActionType::End => {
+                                output.push_str(&to_end_from_rhombus(current_step, v, workflow));
                             }
                         })
                 } else if let Some(next_step) = &workflow.steps.get(i + 1) {
@@ -52,7 +51,8 @@ impl Renderer for MermaidFlowchart {
 }
 
 fn has_goto_actions(step: &Step) -> bool {
-    [Verdict::Ok, Verdict::Ng].iter()
+    [Verdict::Ok, Verdict::Ng]
+        .iter()
         .filter_map(|&v| lookup_actions(step, v))
         .flat_map(|actions| actions.iter())
         .any(|a| a.action_type == ActionType::Goto)
@@ -173,63 +173,117 @@ mod tests {
     use super::*;
     use crate::arazzo::{Criteria, Info};
 
+    // TODO: Cover all successCriteria patterns
     #[test]
-    fn render_steps() {
+    fn render_full() {
         let arazzo = ArazzoDocument {
             info: Info {
                 title: String::from("Workflows"),
             },
-            workflows: vec![Workflow {
-                workflow_id: String::from("workflowFoo"),
-                description: Some(String::from("Workflow foo's description.")),
-                steps: vec![
-                    Step {
-                        step_id: String::from("stepFoo"),
-                        description: Some(String::from("Step foo's description.")),
-                        success_criteria: Some(vec![Criteria {
-                            condition: Some(String::from("$statusCode == 200")),
-                        }]),
-                        on_success: Some(vec![Action {
-                            action_type: ActionType::Goto,
-                            step_id: Some(String::from("stepBar")),
-                        }]),
-                        on_failure: Some(vec![Action {
-                            action_type: ActionType::Goto,
-                            step_id: Some(String::from("stepBaz")),
-                        }]),
-                    },
-                    Step {
-                        step_id: String::from("stepBar"),
-                        description: Some(String::from("Step bar's description.")),
-                        success_criteria: Some(vec![Criteria {
-                            condition: Some(String::from("$statusCode == 200")),
-                        }]),
-                        on_success: Some(vec![Action {
-                            action_type: ActionType::End,
-                            step_id: None,
-                        }]),
-                        on_failure: Some(vec![Action {
-                            action_type: ActionType::Goto,
-                            step_id: Some(String::from("stepBaz")),
-                        }]),
-                    },
-                    Step {
-                        step_id: String::from("stepBaz"),
-                        description: Some(String::from("Step baz's description.")),
-                        success_criteria: Some(vec![Criteria {
-                            condition: Some(String::from("$statusCode == 200")),
-                        }]),
-                        on_success: Some(vec![Action {
-                            action_type: ActionType::End,
-                            step_id: None,
-                        }]),
-                        on_failure: Some(vec![Action {
-                            action_type: ActionType::End,
-                            step_id: None,
-                        }]),
-                    },
-                ],
-            }],
+            workflows: vec![
+                Workflow {
+                    workflow_id: String::from("workflowFoo"),
+                    description: Some(String::from("Workflow foo's description.")),
+                    steps: vec![
+                        Step {
+                            step_id: String::from("stepFoo"),
+                            description: Some(String::from("Step foo's description.")),
+                            success_criteria: Some(vec![Criteria {
+                                condition: Some(String::from("$statusCode == 200")),
+                            }]),
+                            on_success: Some(vec![Action {
+                                action_type: ActionType::Goto,
+                                step_id: Some(String::from("stepBar")),
+                            }]),
+                            on_failure: Some(vec![Action {
+                                action_type: ActionType::Goto,
+                                step_id: Some(String::from("stepBaz")),
+                            }]),
+                        },
+                        Step {
+                            step_id: String::from("stepBar"),
+                            description: Some(String::from("Step bar's description.")),
+                            success_criteria: Some(vec![Criteria {
+                                condition: Some(String::from("$statusCode == 200")),
+                            }]),
+                            on_success: Some(vec![Action {
+                                action_type: ActionType::End,
+                                step_id: None,
+                            }]),
+                            on_failure: Some(vec![Action {
+                                action_type: ActionType::Goto,
+                                step_id: Some(String::from("stepBaz")),
+                            }]),
+                        },
+                        Step {
+                            step_id: String::from("stepBaz"),
+                            description: Some(String::from("Step baz's description.")),
+                            success_criteria: Some(vec![Criteria {
+                                condition: Some(String::from("$statusCode == 200")),
+                            }]),
+                            on_success: Some(vec![Action {
+                                action_type: ActionType::End,
+                                step_id: None,
+                            }]),
+                            on_failure: Some(vec![Action {
+                                action_type: ActionType::End,
+                                step_id: None,
+                            }]),
+                        },
+                    ],
+                },
+                Workflow {
+                    workflow_id: String::from("workflowBar"),
+                    description: Some(String::from("Workflow bar's description.")),
+                    steps: vec![
+                        Step {
+                            step_id: String::from("stepFoo"),
+                            description: Some(String::from("Step foo's description.")),
+                            success_criteria: Some(vec![Criteria {
+                                condition: Some(String::from("$statusCode == 200")),
+                            }]),
+                            on_success: Some(vec![Action {
+                                action_type: ActionType::Goto,
+                                step_id: Some(String::from("stepBar")),
+                            }]),
+                            on_failure: Some(vec![Action {
+                                action_type: ActionType::Goto,
+                                step_id: Some(String::from("stepBaz")),
+                            }]),
+                        },
+                        Step {
+                            step_id: String::from("stepBar"),
+                            description: Some(String::from("Step bar's description.")),
+                            success_criteria: Some(vec![Criteria {
+                                condition: Some(String::from("$statusCode == 200")),
+                            }]),
+                            on_success: Some(vec![Action {
+                                action_type: ActionType::End,
+                                step_id: None,
+                            }]),
+                            on_failure: Some(vec![Action {
+                                action_type: ActionType::Goto,
+                                step_id: Some(String::from("stepBaz")),
+                            }]),
+                        },
+                        Step {
+                            step_id: String::from("stepBaz"),
+                            description: Some(String::from("Step baz's description.")),
+                            success_criteria: Some(vec![Criteria {
+                                condition: Some(String::from("$statusCode == 200")),
+                            }]),
+                            on_success: Some(vec![Action {
+                                action_type: ActionType::End,
+                                step_id: None,
+                            }]),
+                            on_failure: Some(vec![Action {
+                                action_type: ActionType::End,
+                                step_id: None,
+                            }]),
+                        },
+                    ],
+                },
+            ],
         };
 
         let sut = MermaidFlowchart;
@@ -250,13 +304,74 @@ mod tests {
             "    stepBarNode{$statusCode == 200} -->|false| stepBaz\n",
             "    stepBaz[\"Step baz's description.\"] --> workflowFooEndNode((End))\n",
             "    end\n",
+            "    subgraph workflowBar[\"Workflow bar's description.\"]\n",
+            "    stepFoo[\"Step foo's description.\"] --> stepFooNode{$statusCode == 200}\n",
+            "    stepFooNode{$statusCode == 200} -->|true| stepBar\n",
+            "    stepFooNode{$statusCode == 200} -->|false| stepBaz\n",
+            "    stepBar[\"Step bar's description.\"] --> stepBarNode{$statusCode == 200}\n",
+            "    stepBarNode{$statusCode == 200} -->|true| workflowBarEndNode((End))\n",
+            "    stepBarNode{$statusCode == 200} -->|false| stepBaz\n",
+            "    stepBaz[\"Step baz's description.\"] --> workflowBarEndNode((End))\n",
+            "    end\n",
         );
 
         assert_eq!(expected, actual);
     }
 
     #[test]
-    fn render_steps_without_description() {
+    fn render_multiple_workflows() {
+        let arazzo = ArazzoDocument {
+            info: Info {
+                title: String::from("Workflows"),
+            },
+            workflows: vec![
+                Workflow {
+                    workflow_id: String::from("workflowFoo"),
+                    description: None,
+                    steps: vec![Step {
+                        step_id: String::from("stepFoo"),
+                        description: None,
+                        success_criteria: None,
+                        on_success: None,
+                        on_failure: None,
+                    }],
+                },
+                Workflow {
+                    workflow_id: String::from("workflowBar"),
+                    description: None,
+                    steps: vec![Step {
+                        step_id: String::from("stepFoo"),
+                        description: None,
+                        success_criteria: None,
+                        on_success: None,
+                        on_failure: None,
+                    }],
+                },
+            ],
+        };
+
+        let sut = MermaidFlowchart;
+
+        let actual = sut.render(&arazzo);
+
+        let expected = concat!(
+            "---\n",
+            "title: Workflows\n",
+            "---\n",
+            "flowchart TD\n",
+            "    subgraph workflowFoo\n",
+            "    stepFoo --> workflowFooEndNode((End))\n",
+            "    end\n",
+            "    subgraph workflowBar\n",
+            "    stepFoo --> workflowBarEndNode((End))\n",
+            "    end\n",
+        );
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn render_multiple_steps() {
         let arazzo = ArazzoDocument {
             info: Info {
                 title: String::from("Workflows"),
@@ -295,6 +410,42 @@ mod tests {
             "    subgraph workflowFoo\n",
             "    stepFoo --> stepBar\n",
             "    stepBar --> workflowFooEndNode((End))\n",
+            "    end\n",
+        );
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn render_minimal() {
+        let arazzo = ArazzoDocument {
+            info: Info {
+                title: String::from("Workflows"),
+            },
+            workflows: vec![Workflow {
+                workflow_id: String::from("workflowFoo"),
+                description: None,
+                steps: vec![Step {
+                    step_id: String::from("stepFoo"),
+                    description: None,
+                    success_criteria: None,
+                    on_success: None,
+                    on_failure: None,
+                }],
+            }],
+        };
+
+        let sut = MermaidFlowchart;
+
+        let actual = sut.render(&arazzo);
+
+        let expected = concat!(
+            "---\n",
+            "title: Workflows\n",
+            "---\n",
+            "flowchart TD\n",
+            "    subgraph workflowFoo\n",
+            "    stepFoo --> workflowFooEndNode((End))\n",
             "    end\n",
         );
 
