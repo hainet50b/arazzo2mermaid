@@ -271,8 +271,14 @@ mod tests {
                         Step {
                             step_id: String::from("stepBaz"),
                             description: Some(String::from("Step baz's description.")),
-                            success_criteria: None,
-                            on_success: None,
+                            success_criteria: Some(vec![Criteria {
+                                condition: Some(String::from("$statusCode == 200")),
+                            }]),
+                            on_success: Some(vec![Action {
+                                action_type: ActionType::Goto,
+                                workflow_id: Some(String::from("workflowBar")),
+                                step_id: None,
+                            }]),
                             on_failure: None,
                         },
                     ],
@@ -343,7 +349,9 @@ mod tests {
             "    stepBar[\"Step bar's description.\"] --> stepBarNode{$statusCode == 200}\n",
             "    stepBarNode{$statusCode == 200} -->|true| workflowFooEndNode((End))\n",
             "    stepBarNode{$statusCode == 200} -->|false| stepBaz\n",
-            "    stepBaz[\"Step baz's description.\"] --> workflowFooEndNode((End))\n",
+            "    stepBaz[\"Step baz's description.\"] --> stepBazNode{$statusCode == 200}\n",
+            "    stepBazNode{$statusCode == 200} -->|true| workflowBar\n",
+            "    stepBazNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
             "    end\n",
             "    subgraph workflowBar[\"Workflow bar's description.\"]\n",
             "    stepFoo[\"Step foo's description.\"] --> stepFooNode{$statusCode == 200}\n",
