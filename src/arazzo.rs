@@ -42,6 +42,7 @@ pub struct Criteria {
 pub struct Action {
     #[serde(rename = "type")]
     pub action_type: ActionType,
+    pub workflow_id: Option<String>,
     pub step_id: Option<String>,
 }
 

@@ -22,7 +22,13 @@ impl Renderer for MermaidFlowchart {
                         if let Some(action) = actions.first() {
                             match action.action_type {
                                 ActionType::Goto => {
-                                    if let Some(action_step_id) = &action.step_id {
+                                    if let Some(action_workflow_id) = &action.workflow_id {
+                                        output.push_str(&to_rectangle_from_rhombus(
+                                            current_step,
+                                            Verdict::Ok,
+                                            action_workflow_id,
+                                        ))
+                                    } else if let Some(action_step_id) = &action.step_id {
                                         output.push_str(&to_rectangle_from_rhombus(
                                             current_step,
                                             Verdict::Ok,
@@ -53,7 +59,13 @@ impl Renderer for MermaidFlowchart {
                         if let Some(action) = actions.first() {
                             match action.action_type {
                                 ActionType::Goto => {
-                                    if let Some(action_step_id) = &action.step_id {
+                                    if let Some(action_workflow_id) = &action.workflow_id {
+                                        output.push_str(&to_rectangle_from_rhombus(
+                                            current_step,
+                                            Verdict::Ng,
+                                            action_workflow_id,
+                                        ))
+                                    } else if let Some(action_step_id) = &action.step_id {
                                         output.push_str(&to_rectangle_from_rhombus(
                                             current_step,
                                             Verdict::Ng,
@@ -230,10 +242,12 @@ mod tests {
                             }]),
                             on_success: Some(vec![Action {
                                 action_type: ActionType::Goto,
+                                workflow_id: None,
                                 step_id: Some(String::from("stepBar")),
                             }]),
                             on_failure: Some(vec![Action {
                                 action_type: ActionType::Goto,
+                                workflow_id: None,
                                 step_id: Some(String::from("stepBaz")),
                             }]),
                         },
@@ -245,10 +259,12 @@ mod tests {
                             }]),
                             on_success: Some(vec![Action {
                                 action_type: ActionType::End,
+                                workflow_id: None,
                                 step_id: None,
                             }]),
                             on_failure: Some(vec![Action {
                                 action_type: ActionType::Goto,
+                                workflow_id: None,
                                 step_id: Some(String::from("stepBaz")),
                             }]),
                         },
@@ -273,10 +289,12 @@ mod tests {
                             }]),
                             on_success: Some(vec![Action {
                                 action_type: ActionType::Goto,
+                                workflow_id: None,
                                 step_id: Some(String::from("stepBar")),
                             }]),
                             on_failure: Some(vec![Action {
                                 action_type: ActionType::Goto,
+                                workflow_id: None,
                                 step_id: Some(String::from("stepBaz")),
                             }]),
                         },
@@ -288,10 +306,12 @@ mod tests {
                             }]),
                             on_success: Some(vec![Action {
                                 action_type: ActionType::End,
+                                workflow_id: None,
                                 step_id: None,
                             }]),
                             on_failure: Some(vec![Action {
                                 action_type: ActionType::Goto,
+                                workflow_id: None,
                                 step_id: Some(String::from("stepBaz")),
                             }]),
                         },
@@ -491,10 +511,12 @@ mod tests {
                         }]),
                         on_success: Some(vec![Action {
                             action_type: ActionType::Goto,
+                            workflow_id: None,
                             step_id: Some(String::from("stepBar")),
                         }]),
                         on_failure: Some(vec![Action {
                             action_type: ActionType::Goto,
+                            workflow_id: None,
                             step_id: Some(String::from("stepBaz")),
                         }]),
                     },
@@ -555,6 +577,7 @@ mod tests {
                         }]),
                         on_success: Some(vec![Action {
                             action_type: ActionType::Goto,
+                            workflow_id: None,
                             step_id: Some(String::from("stepBar")),
                         }]),
                         on_failure: None,
@@ -609,6 +632,7 @@ mod tests {
                         on_success: None,
                         on_failure: Some(vec![Action {
                             action_type: ActionType::Goto,
+                            workflow_id: None,
                             step_id: Some(String::from("stepBaz")),
                         }]),
                     },
@@ -717,10 +741,12 @@ mod tests {
                         success_criteria: None,
                         on_success: Some(vec![Action {
                             action_type: ActionType::Goto,
+                            workflow_id: None,
                             step_id: Some(String::from("stepBar")),
                         }]),
                         on_failure: Some(vec![Action {
                             action_type: ActionType::Goto,
+                            workflow_id: None,
                             step_id: Some(String::from("stepBaz")),
                         }]),
                     },
@@ -779,6 +805,7 @@ mod tests {
                         success_criteria: None,
                         on_success: Some(vec![Action {
                             action_type: ActionType::Goto,
+                            workflow_id: None,
                             step_id: Some(String::from("stepBar")),
                         }]),
                         on_failure: None,
@@ -831,6 +858,7 @@ mod tests {
                         on_success: None,
                         on_failure: Some(vec![Action {
                             action_type: ActionType::Goto,
+                            workflow_id: None,
                             step_id: Some(String::from("stepBaz")),
                         }]),
                     },
@@ -1008,6 +1036,82 @@ mod tests {
             "    stepFooNode{$statusCode == 200 && $response.body.status == done} -->|true| stepBar\n",
             "    stepFooNode{$statusCode == 200 && $response.body.status == done} -->|false| workflowFooEndNode((End))\n",
             "    stepBar --> workflowFooEndNode((End))\n",
+            "    end\n",
+        );
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn render_on_action_goto_another_workflow() {
+        let arazzo = ArazzoDocument {
+            info: Info {
+                title: String::from("Workflows"),
+            },
+            workflows: vec![
+                Workflow {
+                    workflow_id: String::from("workflowFoo"),
+                    description: None,
+                    steps: vec![Step {
+                        step_id: String::from("stepFoo"),
+                        description: None,
+                        success_criteria: None,
+                        on_success: Some(vec![Action {
+                            action_type: ActionType::Goto,
+                            workflow_id: Some(String::from("workflowBar")),
+                            step_id: None,
+                        }]),
+                        on_failure: Some(vec![Action {
+                            action_type: ActionType::Goto,
+                            workflow_id: Some(String::from("workflowBaz")),
+                            step_id: None,
+                        }]),
+                    }],
+                },
+                Workflow {
+                    workflow_id: String::from("workflowBar"),
+                    description: None,
+                    steps: vec![Step {
+                        step_id: String::from("stepFoo"),
+                        description: None,
+                        success_criteria: None,
+                        on_success: None,
+                        on_failure: None,
+                    }],
+                },
+                Workflow {
+                    workflow_id: String::from("workflowBaz"),
+                    description: None,
+                    steps: vec![Step {
+                        step_id: String::from("stepFoo"),
+                        description: None,
+                        success_criteria: None,
+                        on_success: None,
+                        on_failure: None,
+                    }],
+                },
+            ],
+        };
+
+        let sut = MermaidFlowchart;
+
+        let actual = sut.render(&arazzo);
+
+        let expected = concat!(
+            "---\n",
+            "title: Workflows\n",
+            "---\n",
+            "flowchart TD\n",
+            "    subgraph workflowFoo\n",
+            "    stepFoo --> stepFooNode\n",
+            "    stepFooNode -->|true| workflowBar\n",
+            "    stepFooNode -->|false| workflowBaz\n",
+            "    end\n",
+            "    subgraph workflowBar\n",
+            "    stepFoo --> workflowBarEndNode((End))\n",
+            "    end\n",
+            "    subgraph workflowBaz\n",
+            "    stepFoo --> workflowBazEndNode((End))\n",
             "    end\n",
         );
 
