@@ -1,4 +1,4 @@
-use crate::arazzo::{Action, ActionType, ArazzoDocument, Step, Workflow};
+use crate::arazzo::{ActionType, ArazzoDocument, Step, Workflow};
 
 pub trait Renderer {
     fn render(&self, document: &ArazzoDocument) -> String;
@@ -15,27 +15,64 @@ impl Renderer for MermaidFlowchart {
             output.push_str(&subgraph(workflow));
 
             for (i, current_step) in workflow.steps.iter().enumerate() {
-                if has_goto_actions(current_step) {
+                if should_branch(current_step) {
                     output.push_str(&to_rhombus_from_rectangle(current_step));
 
-                    [Verdict::Ok, Verdict::Ng]
-                        .iter()
-                        .filter_map(|&v| lookup_actions(current_step, v).map(|a| (v, a)))
-                        .flat_map(|(v, actions)| actions.iter().map(move |a| (v, a)))
-                        .for_each(|(v, a)| match a.action_type {
-                            ActionType::Goto => {
-                                if let Some(step_id) = &a.step_id {
-                                    output.push_str(&to_rectangle_from_rhombus(
+                    if let Some(actions) = &current_step.on_success {
+                        if let Some(action) = actions.first() {
+                            match action.action_type {
+                                ActionType::Goto => {
+                                    if let Some(action_step_id) = &action.step_id {
+                                        output.push_str(&to_rectangle_from_rhombus(
+                                            current_step,
+                                            Verdict::Ok,
+                                            action_step_id,
+                                        ))
+                                    }
+                                }
+                                ActionType::End => {
+                                    output.push_str(&to_end_from_rhombus(
                                         current_step,
-                                        v,
-                                        step_id,
+                                        Verdict::Ok,
+                                        workflow,
                                     ));
                                 }
                             }
-                            ActionType::End => {
-                                output.push_str(&to_end_from_rhombus(current_step, v, workflow));
+                        }
+                    } else if let Some(next_step) = &workflow.steps.get(i + 1) {
+                        output.push_str(&to_rectangle_from_rhombus(
+                            current_step,
+                            Verdict::Ok,
+                            &next_step.step_id,
+                        ));
+                    } else {
+                        output.push_str(&to_end_from_rhombus(current_step, Verdict::Ok, workflow));
+                    }
+
+                    if let Some(actions) = &current_step.on_failure {
+                        if let Some(action) = actions.first() {
+                            match action.action_type {
+                                ActionType::Goto => {
+                                    if let Some(action_step_id) = &action.step_id {
+                                        output.push_str(&to_rectangle_from_rhombus(
+                                            current_step,
+                                            Verdict::Ng,
+                                            action_step_id,
+                                        ))
+                                    }
+                                }
+                                ActionType::End => {
+                                    output.push_str(&to_end_from_rhombus(
+                                        current_step,
+                                        Verdict::Ng,
+                                        workflow,
+                                    ));
+                                }
                             }
-                        })
+                        }
+                    } else {
+                        output.push_str(&to_end_from_rhombus(current_step, Verdict::Ng, workflow));
+                    }
                 } else if let Some(next_step) = &workflow.steps.get(i + 1) {
                     output.push_str(&to_rectangle_from_rectangle(current_step, next_step));
                 } else {
@@ -50,19 +87,8 @@ impl Renderer for MermaidFlowchart {
     }
 }
 
-fn has_goto_actions(step: &Step) -> bool {
-    [Verdict::Ok, Verdict::Ng]
-        .iter()
-        .filter_map(|&v| lookup_actions(step, v))
-        .flat_map(|actions| actions.iter())
-        .any(|a| a.action_type == ActionType::Goto)
-}
-
-fn lookup_actions(step: &Step, verdict: Verdict) -> Option<&Vec<Action>> {
-    match verdict {
-        Verdict::Ok => step.on_success.as_ref(),
-        Verdict::Ng => step.on_failure.as_ref(),
-    }
+fn should_branch(step: &Step) -> bool {
+    step.success_criteria.is_some() || step.on_success.is_some() || step.on_failure.is_some()
 }
 
 fn title(arazzo: &ArazzoDocument) -> String {
@@ -171,9 +197,8 @@ fn end_node(workflow: &Workflow) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::arazzo::{Criteria, Info};
+    use crate::arazzo::{Action, Criteria, Info};
 
-    // TODO: Cover all successCriteria patterns
     #[test]
     fn render_full() {
         let arazzo = ArazzoDocument {
@@ -218,17 +243,9 @@ mod tests {
                         Step {
                             step_id: String::from("stepBaz"),
                             description: Some(String::from("Step baz's description.")),
-                            success_criteria: Some(vec![Criteria {
-                                condition: Some(String::from("$statusCode == 200")),
-                            }]),
-                            on_success: Some(vec![Action {
-                                action_type: ActionType::End,
-                                step_id: None,
-                            }]),
-                            on_failure: Some(vec![Action {
-                                action_type: ActionType::End,
-                                step_id: None,
-                            }]),
+                            success_criteria: None,
+                            on_success: None,
+                            on_failure: None,
                         },
                     ],
                 },
@@ -269,17 +286,9 @@ mod tests {
                         Step {
                             step_id: String::from("stepBaz"),
                             description: Some(String::from("Step baz's description.")),
-                            success_criteria: Some(vec![Criteria {
-                                condition: Some(String::from("$statusCode == 200")),
-                            }]),
-                            on_success: Some(vec![Action {
-                                action_type: ActionType::End,
-                                step_id: None,
-                            }]),
-                            on_failure: Some(vec![Action {
-                                action_type: ActionType::End,
-                                step_id: None,
-                            }]),
+                            success_criteria: None,
+                            on_success: None,
+                            on_failure: None,
                         },
                     ],
                 },
@@ -453,7 +462,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn render_success_criteria_defined_on_success_defined_on_failure_defined() {
         let arazzo = ArazzoDocument {
             info: Info {
@@ -518,7 +526,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn render_success_criteria_defined_on_success_defined_on_failure_omitted() {
         let arazzo = ArazzoDocument {
             info: Info {
@@ -556,23 +563,22 @@ mod tests {
         let actual = sut.render(&arazzo);
 
         let expected = concat!(
-        "---\n",
-        "title: Workflows\n",
-        "---\n",
-        "flowchart TD\n",
-        "    subgraph workflowFoo\n",
-        "    stepFoo --> stepFooNode{$statusCode == 200}\n",
-        "    stepFooNode{$statusCode == 200} -->|true| stepBar\n",
-        "    stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
-        "    stepBar --> workflowFooEndNode((End))\n",
-        "    end\n",
+            "---\n",
+            "title: Workflows\n",
+            "---\n",
+            "flowchart TD\n",
+            "    subgraph workflowFoo\n",
+            "    stepFoo --> stepFooNode{$statusCode == 200}\n",
+            "    stepFooNode{$statusCode == 200} -->|true| stepBar\n",
+            "    stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
+            "    stepBar --> workflowFooEndNode((End))\n",
+            "    end\n",
         );
 
         assert_eq!(expected, actual);
     }
 
     #[test]
-    #[ignore]
     fn render_success_criteria_defined_on_success_omitted_on_failure_defined() {
         let arazzo = ArazzoDocument {
             info: Info {
@@ -617,24 +623,23 @@ mod tests {
         let actual = sut.render(&arazzo);
 
         let expected = concat!(
-        "---\n",
-        "title: Workflows\n",
-        "---\n",
-        "flowchart TD\n",
-        "    subgraph workflowFoo\n",
-        "    stepFoo --> stepFooNode{$statusCode == 200}\n",
-        "    stepFooNode{$statusCode == 200} -->|true| stepBar\n",
-        "    stepFooNode{$statusCode == 200} -->|false| stepBaz\n",
-        "    stepBar --> stepBaz\n",
-        "    stepBaz --> workflowFooEndNode((End))\n",
-        "    end\n",
+            "---\n",
+            "title: Workflows\n",
+            "---\n",
+            "flowchart TD\n",
+            "    subgraph workflowFoo\n",
+            "    stepFoo --> stepFooNode{$statusCode == 200}\n",
+            "    stepFooNode{$statusCode == 200} -->|true| stepBar\n",
+            "    stepFooNode{$statusCode == 200} -->|false| stepBaz\n",
+            "    stepBar --> stepBaz\n",
+            "    stepBaz --> workflowFooEndNode((End))\n",
+            "    end\n",
         );
 
         assert_eq!(expected, actual);
     }
 
     #[test]
-    #[ignore]
     fn render_success_criteria_defined_on_success_omitted_on_failure_omitted() {
         let arazzo = ArazzoDocument {
             info: Info {
@@ -669,23 +674,22 @@ mod tests {
         let actual = sut.render(&arazzo);
 
         let expected = concat!(
-        "---\n",
-        "title: Workflows\n",
-        "---\n",
-        "flowchart TD\n",
-        "    subgraph workflowFoo\n",
-        "    stepFoo --> stepFooNode{$statusCode == 200}\n",
-        "    stepFooNode{$statusCode == 200} -->|true| stepBar\n",
-        "    stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
-        "    stepBar --> workflowFooEndNode((End))\n",
-        "    end\n",
+            "---\n",
+            "title: Workflows\n",
+            "---\n",
+            "flowchart TD\n",
+            "    subgraph workflowFoo\n",
+            "    stepFoo --> stepFooNode{$statusCode == 200}\n",
+            "    stepFooNode{$statusCode == 200} -->|true| stepBar\n",
+            "    stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
+            "    stepBar --> workflowFooEndNode((End))\n",
+            "    end\n",
         );
 
         assert_eq!(expected, actual);
     }
 
     #[test]
-    #[ignore]
     fn render_success_criteria_omitted_on_success_defined_on_failure_defined() {
         let arazzo = ArazzoDocument {
             info: Info {
@@ -731,24 +735,23 @@ mod tests {
         let actual = sut.render(&arazzo);
 
         let expected = concat!(
-        "---\n",
-        "title: Workflows\n",
-        "---\n",
-        "flowchart TD\n",
-        "    subgraph workflowFoo\n",
-        "    stepFoo --> stepFooNode\n",
-        "    stepFooNode -->|true| stepBar\n",
-        "    stepFooNode -->|false| stepBaz\n",
-        "    stepBar --> stepBaz\n",
-        "    stepBaz --> workflowFooEndNode((End))\n",
-        "    end\n",
+            "---\n",
+            "title: Workflows\n",
+            "---\n",
+            "flowchart TD\n",
+            "    subgraph workflowFoo\n",
+            "    stepFoo --> stepFooNode\n",
+            "    stepFooNode -->|true| stepBar\n",
+            "    stepFooNode -->|false| stepBaz\n",
+            "    stepBar --> stepBaz\n",
+            "    stepBaz --> workflowFooEndNode((End))\n",
+            "    end\n",
         );
 
         assert_eq!(expected, actual);
     }
 
     #[test]
-    #[ignore]
     fn render_success_criteria_omitted_on_success_defined_on_failure_omitted() {
         let arazzo = ArazzoDocument {
             info: Info {
@@ -784,23 +787,22 @@ mod tests {
         let actual = sut.render(&arazzo);
 
         let expected = concat!(
-        "---\n",
-        "title: Workflows\n",
-        "---\n",
-        "flowchart TD\n",
-        "    subgraph workflowFoo\n",
-        "    stepFoo --> stepFooNode\n",
-        "    stepFooNode -->|true| stepBar\n",
-        "    stepFooNode -->|false| workflowFooEndNode((End))\n",
-        "    stepBar --> workflowFooEndNode((End))\n",
-        "    end\n",
+            "---\n",
+            "title: Workflows\n",
+            "---\n",
+            "flowchart TD\n",
+            "    subgraph workflowFoo\n",
+            "    stepFoo --> stepFooNode\n",
+            "    stepFooNode -->|true| stepBar\n",
+            "    stepFooNode -->|false| workflowFooEndNode((End))\n",
+            "    stepBar --> workflowFooEndNode((End))\n",
+            "    end\n",
         );
 
         assert_eq!(expected, actual);
     }
 
     #[test]
-    #[ignore]
     fn render_success_criteria_omitted_on_success_omitted_on_failure_defined() {
         let arazzo = ArazzoDocument {
             info: Info {
@@ -843,24 +845,23 @@ mod tests {
         let actual = sut.render(&arazzo);
 
         let expected = concat!(
-        "---\n",
-        "title: Workflows\n",
-        "---\n",
-        "flowchart TD\n",
-        "    subgraph workflowFoo\n",
-        "    stepFoo --> stepFooNode\n",
-        "    stepFooNode -->|true| stepBar\n",
-        "    stepFooNode -->|false| stepBaz\n",
-        "    stepBar --> stepBaz\n",
-        "    stepBaz --> workflowFooEndNode((End))\n",
-        "    end\n",
+            "---\n",
+            "title: Workflows\n",
+            "---\n",
+            "flowchart TD\n",
+            "    subgraph workflowFoo\n",
+            "    stepFoo --> stepFooNode\n",
+            "    stepFooNode -->|true| stepBar\n",
+            "    stepFooNode -->|false| stepBaz\n",
+            "    stepBar --> stepBaz\n",
+            "    stepBaz --> workflowFooEndNode((End))\n",
+            "    end\n",
         );
 
         assert_eq!(expected, actual);
     }
 
     #[test]
-    #[ignore]
     fn render_success_criteria_omitted_on_success_omitted_on_failure_omitted() {
         let arazzo = ArazzoDocument {
             info: Info {
@@ -893,13 +894,55 @@ mod tests {
         let actual = sut.render(&arazzo);
 
         let expected = concat!(
+            "---\n",
+            "title: Workflows\n",
+            "---\n",
+            "flowchart TD\n",
+            "    subgraph workflowFoo\n",
+            "    stepFoo --> stepBar\n",
+            "    stepBar --> workflowFooEndNode((End))\n",
+            "    end\n",
+        );
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn render_on_success_omitted_on_last_node() {
+        let arazzo = ArazzoDocument {
+            info: Info {
+                title: String::from("Workflows"),
+            },
+            workflows: vec![Workflow {
+                workflow_id: String::from("workflowFoo"),
+                description: None,
+                steps: vec![
+                    Step {
+                        step_id: String::from("stepFoo"),
+                        description: None,
+                        success_criteria: Some(vec![Criteria {
+                            condition: Some(String::from("$statusCode == 200")),
+                        }]),
+                        on_success: None,
+                        on_failure: None,
+                    },
+                ],
+            }],
+        };
+
+        let sut = MermaidFlowchart;
+
+        let actual = sut.render(&arazzo);
+
+        let expected = concat!(
         "---\n",
         "title: Workflows\n",
         "---\n",
         "flowchart TD\n",
         "    subgraph workflowFoo\n",
-        "    stepFoo --> stepBar\n",
-        "    stepBar --> workflowFooEndNode((End))\n",
+        "    stepFoo --> stepFooNode{$statusCode == 200}\n",
+        "    stepFooNode{$statusCode == 200} -->|true| workflowFooEndNode((End))\n",
+        "    stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
         "    end\n",
         );
 
