@@ -102,7 +102,7 @@ fn subgraph(workflow: &Workflow) -> String {
         workflow
             .description
             .as_ref()
-            .map_or(String::from(""), |v| format!("[\"{}\"]", v))
+            .map_or(String::new(), |v| format!("[\"{}\"]", v))
     )
 }
 
@@ -171,7 +171,7 @@ fn rectangle_node(step: &Step) -> String {
 fn node_label(step: &Step) -> String {
     step.description
         .as_ref()
-        .map_or(String::from(""), |v| format!("[\"{}\"]", v))
+        .map_or(String::new(), |v| format!("[\"{}\"]", v))
 }
 
 fn rhombus_node(step: &Step) -> String {
@@ -183,11 +183,23 @@ fn rhombus_node(step: &Step) -> String {
 }
 
 fn condition(step: &Step) -> String {
-    step.success_criteria
-        .as_ref()
-        .and_then(|cs| cs.first())
-        .and_then(|c| c.condition.as_ref())
-        .map_or(String::from(""), |v| format!("{{{}}}", v))
+    if let Some(criteria) = &step.success_criteria
+        && !criteria.is_empty()
+    {
+        let condition = criteria
+            .iter()
+            .filter_map(|c| c.condition.as_deref())
+            .collect::<Vec<&str>>()
+            .join(" && ");
+
+        if condition.is_empty() {
+            String::new()
+        } else {
+            format!("{{{condition}}}")
+        }
+    } else {
+        String::new()
+    }
 }
 
 fn end_node(workflow: &Workflow) -> String {
@@ -916,13 +928,65 @@ mod tests {
             workflows: vec![Workflow {
                 workflow_id: String::from("workflowFoo"),
                 description: None,
+                steps: vec![Step {
+                    step_id: String::from("stepFoo"),
+                    description: None,
+                    success_criteria: Some(vec![Criteria {
+                        condition: Some(String::from("$statusCode == 200")),
+                    }]),
+                    on_success: None,
+                    on_failure: None,
+                }],
+            }],
+        };
+
+        let sut = MermaidFlowchart;
+
+        let actual = sut.render(&arazzo);
+
+        let expected = concat!(
+            "---\n",
+            "title: Workflows\n",
+            "---\n",
+            "flowchart TD\n",
+            "    subgraph workflowFoo\n",
+            "    stepFoo --> stepFooNode{$statusCode == 200}\n",
+            "    stepFooNode{$statusCode == 200} -->|true| workflowFooEndNode((End))\n",
+            "    stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
+            "    end\n",
+        );
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn render_multiple_criteria_conditions() {
+        let arazzo = ArazzoDocument {
+            info: Info {
+                title: String::from("Workflows"),
+            },
+            workflows: vec![Workflow {
+                workflow_id: String::from("workflowFoo"),
+                description: None,
                 steps: vec![
                     Step {
                         step_id: String::from("stepFoo"),
                         description: None,
-                        success_criteria: Some(vec![Criteria {
-                            condition: Some(String::from("$statusCode == 200")),
-                        }]),
+                        success_criteria: Some(vec![
+                            Criteria {
+                                condition: Some(String::from("$statusCode == 200")),
+                            },
+                            Criteria {
+                                condition: Some(String::from("$response.body.status == done")),
+                            },
+                        ]),
+                        on_success: None,
+                        on_failure: None,
+                    },
+                    Step {
+                        step_id: String::from("stepBar"),
+                        description: None,
+                        success_criteria: None,
                         on_success: None,
                         on_failure: None,
                     },
@@ -935,15 +999,16 @@ mod tests {
         let actual = sut.render(&arazzo);
 
         let expected = concat!(
-        "---\n",
-        "title: Workflows\n",
-        "---\n",
-        "flowchart TD\n",
-        "    subgraph workflowFoo\n",
-        "    stepFoo --> stepFooNode{$statusCode == 200}\n",
-        "    stepFooNode{$statusCode == 200} -->|true| workflowFooEndNode((End))\n",
-        "    stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
-        "    end\n",
+            "---\n",
+            "title: Workflows\n",
+            "---\n",
+            "flowchart TD\n",
+            "    subgraph workflowFoo\n",
+            "    stepFoo --> stepFooNode{$statusCode == 200 && $response.body.status == done}\n",
+            "    stepFooNode{$statusCode == 200 && $response.body.status == done} -->|true| stepBar\n",
+            "    stepFooNode{$statusCode == 200 && $response.body.status == done} -->|false| workflowFooEndNode((End))\n",
+            "    stepBar --> workflowFooEndNode((End))\n",
+            "    end\n",
         );
 
         assert_eq!(expected, actual);
