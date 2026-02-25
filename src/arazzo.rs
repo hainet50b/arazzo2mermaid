@@ -44,6 +44,7 @@ pub struct Action {
     pub action_type: ActionType,
     pub workflow_id: Option<String>,
     pub step_id: Option<String>,
+    pub criteria: Option<Vec<Criteria>>,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]

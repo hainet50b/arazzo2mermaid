@@ -91,3 +91,6 @@ default sequential flow.
 ### Defaults from the Arazzo specification
 
 When `onSuccess` is omitted, the next sequential step is executed. When `onFailure` is omitted, the workflow breaks and returns (treated as End in the diagram). These defaults follow the [Arazzo Specification v1.0.1](https://spec.openapis.org/arazzo/latest.html).
+
+When an action (such as `on_success`) defines `criteria` and none of them are met, the workflow is treated as End. This behavior is not explicitly defined in the Arazzo specification.
+

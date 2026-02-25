@@ -1,4 +1,4 @@
-use crate::arazzo::{ActionType, ArazzoDocument, Step, Workflow};
+use crate::arazzo::{ActionType, ArazzoDocument, Criteria, Step};
 
 pub trait Renderer {
     fn render(&self, document: &ArazzoDocument) -> String;
@@ -8,87 +8,195 @@ pub struct MermaidFlowchart;
 
 impl Renderer for MermaidFlowchart {
     fn render(&self, arazzo: &ArazzoDocument) -> String {
-        let mut output = title(arazzo);
+        let mut output = title(arazzo.info.title.as_ref());
         output.push_str("flowchart TD\n");
 
         for workflow in &arazzo.workflows {
-            output.push_str(&subgraph(workflow));
+            output.push_str(&subgraph(
+                &workflow.workflow_id,
+                workflow.description.as_deref(),
+            ));
 
             for (i, current_step) in workflow.steps.iter().enumerate() {
                 if should_branch(current_step) {
-                    output.push_str(&to_rhombus_from_rectangle(current_step));
+                    output.push_str(&to_rhombus_from_rectangle(
+                        &rectangle_node(&current_step.step_id, &current_step.description),
+                        &rhombus_node(&current_step.step_id, &current_step.success_criteria),
+                    ));
 
                     if let Some(actions) = &current_step.on_success {
                         if let Some(action) = actions.first() {
+                            let mut from_rhombus_node =
+                                rhombus_node(&current_step.step_id, &current_step.success_criteria);
+                            let mut updated = false;
+                            if action.criteria.is_some() {
+                                let to_rhombus_node = rhombus_node(
+                                    &format!("{}SuccessAction", &current_step.step_id),
+                                    &action.criteria,
+                                );
+
+                                output.push_str(&to_rhombus_from_rhombus(
+                                    &from_rhombus_node,
+                                    &to_rhombus_node,
+                                    Verdict::Ok,
+                                ));
+
+                                from_rhombus_node = to_rhombus_node;
+                                updated = true;
+                            }
+
                             match action.action_type {
                                 ActionType::Goto => {
                                     if let Some(action_workflow_id) = &action.workflow_id {
                                         output.push_str(&to_rectangle_from_rhombus(
-                                            current_step,
+                                            &from_rhombus_node,
+                                            &rectangle_node(action_workflow_id, &None),
                                             Verdict::Ok,
-                                            action_workflow_id,
-                                        ))
+                                        ));
+
+                                        if updated {
+                                            output.push_str(&to_end_from_rhombus(
+                                                &from_rhombus_node,
+                                                &end_node(&workflow.workflow_id),
+                                                Verdict::Ng,
+                                            ));
+                                        }
                                     } else if let Some(action_step_id) = &action.step_id {
                                         output.push_str(&to_rectangle_from_rhombus(
-                                            current_step,
+                                            &from_rhombus_node,
+                                            &rectangle_node(action_step_id, &None),
                                             Verdict::Ok,
-                                            action_step_id,
-                                        ))
+                                        ));
+
+                                        if updated {
+                                            output.push_str(&to_end_from_rhombus(
+                                                &from_rhombus_node,
+                                                &end_node(&workflow.workflow_id),
+                                                Verdict::Ng,
+                                            ));
+                                        }
                                     }
                                 }
                                 ActionType::End => {
                                     output.push_str(&to_end_from_rhombus(
-                                        current_step,
+                                        &from_rhombus_node,
+                                        &end_node(&workflow.workflow_id),
                                         Verdict::Ok,
-                                        workflow,
                                     ));
+
+                                    if updated {
+                                        output.push_str(&to_end_from_rhombus(
+                                            &from_rhombus_node,
+                                            &end_node(&workflow.workflow_id),
+                                            Verdict::Ng,
+                                        ));
+                                    }
                                 }
                             }
                         }
                     } else if let Some(next_step) = &workflow.steps.get(i + 1) {
                         output.push_str(&to_rectangle_from_rhombus(
-                            current_step,
+                            &rhombus_node(&current_step.step_id, &current_step.success_criteria),
+                            &rectangle_node(&next_step.step_id, &next_step.description),
                             Verdict::Ok,
-                            &next_step.step_id,
                         ));
                     } else {
-                        output.push_str(&to_end_from_rhombus(current_step, Verdict::Ok, workflow));
+                        output.push_str(&to_end_from_rhombus(
+                            &rhombus_node(&current_step.step_id, &current_step.success_criteria),
+                            &end_node(&workflow.workflow_id),
+                            Verdict::Ok,
+                        ));
                     }
 
                     if let Some(actions) = &current_step.on_failure {
                         if let Some(action) = actions.first() {
+                            let mut from_rhombus_node =
+                                rhombus_node(&current_step.step_id, &current_step.success_criteria);
+                            let mut verdict = Verdict::Ng;
+                            let mut updated = false;
+                            if action.criteria.is_some() {
+                                let to_rhombus_node = rhombus_node(
+                                    &format!("{}FailureAction", &current_step.step_id),
+                                    &action.criteria,
+                                );
+
+                                output.push_str(&to_rhombus_from_rhombus(
+                                    &from_rhombus_node,
+                                    &to_rhombus_node,
+                                    verdict,
+                                ));
+
+                                from_rhombus_node = to_rhombus_node;
+                                verdict = Verdict::Ok;
+                                updated = true;
+                            }
+
                             match action.action_type {
                                 ActionType::Goto => {
                                     if let Some(action_workflow_id) = &action.workflow_id {
                                         output.push_str(&to_rectangle_from_rhombus(
-                                            current_step,
-                                            Verdict::Ng,
-                                            action_workflow_id,
-                                        ))
+                                            &from_rhombus_node,
+                                            &rectangle_node(action_workflow_id, &None),
+                                            verdict,
+                                        ));
+
+                                        if updated {
+                                            output.push_str(&to_end_from_rhombus(
+                                                &from_rhombus_node,
+                                                &end_node(&workflow.workflow_id),
+                                                Verdict::Ng,
+                                            ));
+                                        }
                                     } else if let Some(action_step_id) = &action.step_id {
                                         output.push_str(&to_rectangle_from_rhombus(
-                                            current_step,
-                                            Verdict::Ng,
-                                            action_step_id,
-                                        ))
+                                            &from_rhombus_node,
+                                            &rectangle_node(action_step_id, &None),
+                                            verdict,
+                                        ));
+
+                                        if updated {
+                                            output.push_str(&to_end_from_rhombus(
+                                                &from_rhombus_node,
+                                                &end_node(&workflow.workflow_id),
+                                                Verdict::Ng,
+                                            ));
+                                        }
                                     }
                                 }
                                 ActionType::End => {
                                     output.push_str(&to_end_from_rhombus(
-                                        current_step,
-                                        Verdict::Ng,
-                                        workflow,
+                                        &from_rhombus_node,
+                                        &end_node(&workflow.workflow_id),
+                                        verdict,
                                     ));
+
+                                    if updated {
+                                        output.push_str(&to_end_from_rhombus(
+                                            &from_rhombus_node,
+                                            &end_node(&workflow.workflow_id),
+                                            Verdict::Ng,
+                                        ));
+                                    }
                                 }
                             }
                         }
                     } else {
-                        output.push_str(&to_end_from_rhombus(current_step, Verdict::Ng, workflow));
+                        output.push_str(&to_end_from_rhombus(
+                            &rhombus_node(&current_step.step_id, &current_step.success_criteria),
+                            &end_node(&workflow.workflow_id),
+                            Verdict::Ng,
+                        ));
                     }
                 } else if let Some(next_step) = &workflow.steps.get(i + 1) {
-                    output.push_str(&to_rectangle_from_rectangle(current_step, next_step));
+                    output.push_str(&to_rectangle_from_rectangle(
+                        &rectangle_node(&current_step.step_id, &current_step.description),
+                        &rectangle_node(&next_step.step_id, &next_step.description),
+                    ));
                 } else {
-                    output.push_str(&to_end_from_rectangle(current_step, workflow));
+                    output.push_str(&to_end_from_rectangle(
+                        &rectangle_node(&current_step.step_id, &current_step.description),
+                        &end_node(&workflow.workflow_id),
+                    ));
                 }
             }
 
@@ -103,66 +211,79 @@ fn should_branch(step: &Step) -> bool {
     step.success_criteria.is_some() || step.on_success.is_some() || step.on_failure.is_some()
 }
 
-fn title(arazzo: &ArazzoDocument) -> String {
-    format!("---\ntitle: {}\n---\n", arazzo.info.title)
+fn title(graph_title: &str) -> String {
+    format!("---\ntitle: {graph_title}\n---\n")
 }
 
-fn subgraph(workflow: &Workflow) -> String {
+fn subgraph(title: &str, description: Option<&str>) -> String {
     format!(
-        "    subgraph {}{}\n",
-        workflow.workflow_id,
-        workflow
-            .description
-            .as_ref()
-            .map_or(String::new(), |v| format!("[\"{}\"]", v))
+        "    subgraph {subgraph_title}{subgraph_description}\n",
+        subgraph_title = title,
+        subgraph_description = subgraph_description(description)
     )
 }
 
-fn to_rhombus_from_rectangle(step: &Step) -> String {
-    format!(
-        "    {rectangle_node} --> {rhombus_node}\n",
-        rectangle_node = rectangle_node(step),
-        rhombus_node = rhombus_node(step),
-    )
+fn subgraph_description(subgraph_description: Option<&str>) -> String {
+    subgraph_description.map_or(String::new(), |v| format!("[\"{}\"]", v))
 }
 
-fn to_rectangle_from_rhombus(step: &Step, verdict: Verdict, step_id: &str) -> String {
-    format!(
-        "    {rhombus_node} -->|{verdict}| {rectangle_node}\n",
-        rhombus_node = rhombus_node(step),
-        verdict = match verdict {
-            Verdict::Ok => "true",
-            Verdict::Ng => "false",
-        },
-        rectangle_node = step_id,
-    )
-}
-
-fn to_rectangle_from_rectangle(from: &Step, to: &Step) -> String {
+fn to_rectangle_from_rectangle(from: &str, to: &str) -> String {
     format!(
         "    {from_node} --> {to_node}\n",
-        from_node = rectangle_node(from),
-        to_node = rectangle_node(to),
+        from_node = from,
+        to_node = to,
     )
 }
 
-fn to_end_from_rectangle(step: &Step, workflow: &Workflow) -> String {
+fn to_rectangle_from_rhombus(from: &str, to: &str, verdict: Verdict) -> String {
     format!(
-        "    {rectangle_node} --> {end_node}\n",
-        rectangle_node = rectangle_node(step),
-        end_node = end_node(workflow),
-    )
-}
-
-fn to_end_from_rhombus(step: &Step, verdict: Verdict, workflow: &Workflow) -> String {
-    format!(
-        "    {rhombus_node} -->|{verdict}| {end_node}\n",
-        rhombus_node = rhombus_node(step),
+        "    {rhombus_node} -->|{verdict}| {rectangle_node}\n",
+        rhombus_node = from,
+        rectangle_node = to,
         verdict = match verdict {
             Verdict::Ok => "true",
             Verdict::Ng => "false",
         },
-        end_node = end_node(workflow),
+    )
+}
+
+fn to_rhombus_from_rectangle(from: &str, to: &str) -> String {
+    format!(
+        "    {rectangle_node} --> {rhombus_node}\n",
+        rectangle_node = from,
+        rhombus_node = to,
+    )
+}
+
+fn to_rhombus_from_rhombus(from: &str, to: &str, verdict: Verdict) -> String {
+    format!(
+        "    {from_node} -->|{verdict}| {to_node}\n",
+        from_node = from,
+        to_node = to,
+        verdict = match verdict {
+            Verdict::Ok => "true",
+            Verdict::Ng => "false",
+        },
+    )
+}
+
+fn to_end_from_rectangle(from: &str, to: &str) -> String {
+    format!(
+        "    {rectangle_node} --> {end_node}\n",
+        rectangle_node = from,
+        end_node = to,
+    )
+}
+
+fn to_end_from_rhombus(from: &str, to: &str, verdict: Verdict) -> String {
+    format!(
+        "    {rhombus_node} -->|{verdict}| {end_node}\n",
+        rhombus_node = from,
+        end_node = to,
+        verdict = match verdict {
+            Verdict::Ok => "true",
+            Verdict::Ng => "false",
+        },
     )
 }
 
@@ -172,30 +293,28 @@ enum Verdict {
     Ng,
 }
 
-fn rectangle_node(step: &Step) -> String {
+fn rectangle_node(node_name: &str, node_label: &Option<String>) -> String {
     format!(
         "{node_name}{node_label}",
-        node_name = step.step_id,
-        node_label = node_label(step),
+        node_label = rectangle_node_label(node_label),
     )
 }
 
-fn node_label(step: &Step) -> String {
-    step.description
-        .as_ref()
+fn rectangle_node_label(node_label: &Option<String>) -> String {
+    node_label
+        .as_deref()
         .map_or(String::new(), |v| format!("[\"{}\"]", v))
 }
 
-fn rhombus_node(step: &Step) -> String {
+fn rhombus_node(node_name: &str, criteria: &Option<Vec<Criteria>>) -> String {
     format!(
         "{node_name}Node{condition}",
-        node_name = step.step_id,
-        condition = condition(step),
+        condition = rhombus_node_condition(criteria),
     )
 }
 
-fn condition(step: &Step) -> String {
-    if let Some(criteria) = &step.success_criteria
+fn rhombus_node_condition(criteria: &Option<Vec<Criteria>>) -> String {
+    if let Some(criteria) = &criteria
         && !criteria.is_empty()
     {
         let condition = criteria
@@ -214,15 +333,16 @@ fn condition(step: &Step) -> String {
     }
 }
 
-fn end_node(workflow: &Workflow) -> String {
-    format!("{}EndNode((End))", workflow.workflow_id)
+fn end_node(node_name: &str) -> String {
+    format!("{node_name}EndNode((End))")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::arazzo::{Action, Criteria, Info};
+    use crate::arazzo::{Action, Criteria, Info, Workflow};
 
+    // TODO: Include on_action.criteria validation
     #[test]
     fn render_full() {
         let arazzo = ArazzoDocument {
@@ -244,11 +364,13 @@ mod tests {
                                 action_type: ActionType::Goto,
                                 workflow_id: None,
                                 step_id: Some(String::from("stepBar")),
+                                criteria: None,
                             }]),
                             on_failure: Some(vec![Action {
                                 action_type: ActionType::Goto,
                                 workflow_id: None,
                                 step_id: Some(String::from("stepBaz")),
+                                criteria: None,
                             }]),
                         },
                         Step {
@@ -261,11 +383,13 @@ mod tests {
                                 action_type: ActionType::End,
                                 workflow_id: None,
                                 step_id: None,
+                                criteria: None,
                             }]),
                             on_failure: Some(vec![Action {
                                 action_type: ActionType::Goto,
                                 workflow_id: None,
                                 step_id: Some(String::from("stepBaz")),
+                                criteria: None,
                             }]),
                         },
                         Step {
@@ -278,6 +402,7 @@ mod tests {
                                 action_type: ActionType::Goto,
                                 workflow_id: Some(String::from("workflowBar")),
                                 step_id: None,
+                                criteria: None,
                             }]),
                             on_failure: None,
                         },
@@ -297,11 +422,13 @@ mod tests {
                                 action_type: ActionType::Goto,
                                 workflow_id: None,
                                 step_id: Some(String::from("stepBar")),
+                                criteria: None,
                             }]),
                             on_failure: Some(vec![Action {
                                 action_type: ActionType::Goto,
                                 workflow_id: None,
                                 step_id: Some(String::from("stepBaz")),
+                                criteria: None,
                             }]),
                         },
                         Step {
@@ -314,11 +441,13 @@ mod tests {
                                 action_type: ActionType::End,
                                 workflow_id: None,
                                 step_id: None,
+                                criteria: None,
                             }]),
                             on_failure: Some(vec![Action {
                                 action_type: ActionType::Goto,
                                 workflow_id: None,
                                 step_id: Some(String::from("stepBaz")),
+                                criteria: None,
                             }]),
                         },
                         Step {
@@ -521,11 +650,13 @@ mod tests {
                             action_type: ActionType::Goto,
                             workflow_id: None,
                             step_id: Some(String::from("stepBar")),
+                            criteria: None,
                         }]),
                         on_failure: Some(vec![Action {
                             action_type: ActionType::Goto,
                             workflow_id: None,
                             step_id: Some(String::from("stepBaz")),
+                            criteria: None,
                         }]),
                     },
                     Step {
@@ -587,6 +718,7 @@ mod tests {
                             action_type: ActionType::Goto,
                             workflow_id: None,
                             step_id: Some(String::from("stepBar")),
+                            criteria: None,
                         }]),
                         on_failure: None,
                     },
@@ -642,6 +774,7 @@ mod tests {
                             action_type: ActionType::Goto,
                             workflow_id: None,
                             step_id: Some(String::from("stepBaz")),
+                            criteria: None,
                         }]),
                     },
                     Step {
@@ -751,11 +884,13 @@ mod tests {
                             action_type: ActionType::Goto,
                             workflow_id: None,
                             step_id: Some(String::from("stepBar")),
+                            criteria: None,
                         }]),
                         on_failure: Some(vec![Action {
                             action_type: ActionType::Goto,
                             workflow_id: None,
                             step_id: Some(String::from("stepBaz")),
+                            criteria: None,
                         }]),
                     },
                     Step {
@@ -815,6 +950,7 @@ mod tests {
                             action_type: ActionType::Goto,
                             workflow_id: None,
                             step_id: Some(String::from("stepBar")),
+                            criteria: None,
                         }]),
                         on_failure: None,
                     },
@@ -868,6 +1004,7 @@ mod tests {
                             action_type: ActionType::Goto,
                             workflow_id: None,
                             step_id: Some(String::from("stepBaz")),
+                            criteria: None,
                         }]),
                     },
                     Step {
@@ -996,7 +1133,7 @@ mod tests {
     }
 
     #[test]
-    fn render_multiple_criteria_conditions() {
+    fn render_multiple_success_criteria() {
         let arazzo = ArazzoDocument {
             info: Info {
                 title: String::from("Workflows"),
@@ -1051,6 +1188,148 @@ mod tests {
     }
 
     #[test]
+    fn render_action_criteria() {
+        let arazzo = ArazzoDocument {
+            info: Info {
+                title: String::from("Workflows"),
+            },
+            workflows: vec![Workflow {
+                workflow_id: String::from("workflowFoo"),
+                description: None,
+                steps: vec![
+                    Step {
+                        step_id: String::from("stepFoo"),
+                        description: None,
+                        success_criteria: Some(vec![Criteria {
+                            condition: Some(String::from("$statusCode == 200")),
+                        }]),
+                        on_success: Some(vec![Action {
+                            action_type: ActionType::Goto,
+                            workflow_id: None,
+                            step_id: Some(String::from("stepBar")),
+                            criteria: Some(vec![Criteria {
+                                condition: Some(String::from(
+                                    "$response.body.status == 'approved'",
+                                )),
+                            }]),
+                        }]),
+                        on_failure: Some(vec![Action {
+                            action_type: ActionType::Goto,
+                            workflow_id: None,
+                            step_id: Some(String::from("stepBaz")),
+                            criteria: Some(vec![Criteria {
+                                condition: Some(String::from("$response.body.error != null")),
+                            }]),
+                        }]),
+                    },
+                    Step {
+                        step_id: String::from("stepBar"),
+                        description: None,
+                        success_criteria: None,
+                        on_success: None,
+                        on_failure: None,
+                    },
+                    Step {
+                        step_id: String::from("stepBaz"),
+                        description: None,
+                        success_criteria: None,
+                        on_success: None,
+                        on_failure: None,
+                    },
+                ],
+            }],
+        };
+
+        let sut = MermaidFlowchart;
+
+        let actual = sut.render(&arazzo);
+
+        let expected = concat!(
+            "---\n",
+            "title: Workflows\n",
+            "---\n",
+            "flowchart TD\n",
+            "    subgraph workflowFoo\n",
+            "    stepFoo --> stepFooNode{$statusCode == 200}\n",
+            "    stepFooNode{$statusCode == 200} -->|true| stepFooSuccessActionNode{$response.body.status == 'approved'}\n",
+            "    stepFooSuccessActionNode{$response.body.status == 'approved'} -->|true| stepBar\n",
+            "    stepFooSuccessActionNode{$response.body.status == 'approved'} -->|false| workflowFooEndNode((End))\n",
+            "    stepFooNode{$statusCode == 200} -->|false| stepFooFailureActionNode{$response.body.error != null}\n",
+            "    stepFooFailureActionNode{$response.body.error != null} -->|true| stepBaz\n",
+            "    stepFooFailureActionNode{$response.body.error != null} -->|false| workflowFooEndNode((End))\n",
+            "    stepBar --> stepBaz\n",
+            "    stepBaz --> workflowFooEndNode((End))\n",
+            "    end\n",
+        );
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn render_multiple_action_criteria() {
+        let arazzo = ArazzoDocument {
+            info: Info {
+                title: String::from("Workflows"),
+            },
+            workflows: vec![Workflow {
+                workflow_id: String::from("workflowFoo"),
+                description: None,
+                steps: vec![
+                    Step {
+                        step_id: String::from("stepFoo"),
+                        description: None,
+                        success_criteria: None,
+                        on_success: Some(vec![Action {
+                            action_type: ActionType::Goto,
+                            workflow_id: None,
+                            step_id: Some(String::from("stepBar")),
+                            criteria: Some(vec![
+                                Criteria {
+                                    condition: Some(String::from(
+                                        "$response.body.status == 'approved'",
+                                    )),
+                                },
+                                Criteria {
+                                    condition: Some(String::from("$response.body.error != null")),
+                                },
+                            ]),
+                        }]),
+                        on_failure: None,
+                    },
+                    Step {
+                        step_id: String::from("stepBar"),
+                        description: None,
+                        success_criteria: None,
+                        on_success: None,
+                        on_failure: None,
+                    },
+                ],
+            }],
+        };
+
+        let sut = MermaidFlowchart;
+
+        let actual = sut.render(&arazzo);
+
+        let expected = concat!(
+            "---\n",
+            "title: Workflows\n",
+            "---\n",
+            "flowchart TD\n",
+            "    subgraph workflowFoo\n",
+            "    stepFoo --> stepFooNode\n",
+            "    stepFooNode -->|true| stepFooSuccessActionNode{$response.body.status == 'approved' && $response.body.error != null}\n",
+            "    stepFooSuccessActionNode{$response.body.status == 'approved' && $response.body.error != null} -->|true| stepBar\n",
+            "    stepFooSuccessActionNode{$response.body.status == 'approved' && $response.body.error != null} -->|false| workflowFooEndNode((End))\n",
+            "    stepFooNode -->|false| workflowFooEndNode((End))\n",
+            "    stepBar --> workflowFooEndNode((End))\n",
+            "    end\n",
+        );
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
     fn render_on_action_goto_another_workflow() {
         let arazzo = ArazzoDocument {
             info: Info {
@@ -1068,11 +1347,13 @@ mod tests {
                             action_type: ActionType::Goto,
                             workflow_id: Some(String::from("workflowBar")),
                             step_id: None,
+                            criteria: None,
                         }]),
                         on_failure: Some(vec![Action {
                             action_type: ActionType::Goto,
                             workflow_id: Some(String::from("workflowBaz")),
                             step_id: None,
+                            criteria: None,
                         }]),
                     }],
                 },
