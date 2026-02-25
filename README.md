@@ -9,8 +9,7 @@ A lightweight Rust CLI tool that converts Arazzo workflows into Mermaid diagrams
 
 `arazzo2mermaid` converts Arazzo workflows into Mermaid diagrams for documentation and visualization.
 
-The Arazzo ecosystem is still evolving, and dedicated visualization tools are limited. This tool is intended as a bridge
-to connect Arazzo to the existing Mermaid ecosystem until more dedicated tooling matures.
+The Arazzo ecosystem is still evolving, and dedicated visualization tools are limited. This tool is intended as a bridge to connect Arazzo to the existing Mermaid ecosystem until more dedicated tooling matures.
 
 ## Features
 
@@ -80,17 +79,22 @@ default sequential flow.
 | Omitted         | Omitted   | Defined   | Rhombus node without condition label. `true` edge goes to the next step. `false` edge follows onFailure. |
 | Omitted         | Omitted   | Omitted   | Rectangle node connected to the next step, or End if it is the last step.                                |
 
+When `successCriteria` contains multiple criteria, their conditions are joined with `&&` and displayed as a single rhombus label.
+
+### Cross-workflow connections
+
+When an action (such as `onSuccess`) specifies `workflowId` instead of `stepId`, the edge goes to the referenced workflow's subgraph node. `workflowId` and `stepId` are mutually exclusive per the Arazzo specification. If both are defined, `workflowId` takes precedence over `stepId`.
+
 ### Node shapes
 
-| Shape                   | Meaning                                   |
-|-------------------------|-------------------------------------------|
-| Rectangle (`[label]`)   | A workflow step                           |
-| Rhombus (`{condition}`) | A decision point based on successCriteria |
-| Circle (`((End))`)      | End of the workflow                       |
+| Shape                   | Meaning                                                   |
+|-------------------------|-----------------------------------------------------------|
+| Rectangle (`[label]`)   | A workflow step                                           |
+| Rhombus (`{condition}`) | A decision point based on `successCriteria` or `criteria` |
+| Circle (`((End))`)      | End of the workflow                                       |
 
 ### Defaults from the Arazzo specification
 
 When `onSuccess` is omitted, the next sequential step is executed. When `onFailure` is omitted, the workflow breaks and returns (treated as End in the diagram). These defaults follow the [Arazzo Specification v1.0.1](https://spec.openapis.org/arazzo/latest.html).
 
-When an action (such as `onSuccess`) defines `criteria` and not all of them are met, the workflow is treated as End. This behavior is not explicitly defined in the Arazzo specification.
-
+When an action (such as `onSuccess`) defines `criteria`, an additional rhombus node is inserted in the flow. The `true` edge proceeds to the action target, and the `false` edge goes to End. This behavior when not all criteria are met is not explicitly defined in the Arazzo specification.
