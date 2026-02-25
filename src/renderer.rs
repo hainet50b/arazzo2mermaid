@@ -24,7 +24,9 @@ impl Renderer for MermaidFlowchart {
                         &rhombus_node(&current_step.step_id, &current_step.success_criteria),
                     ));
 
-                    if let Some(on_success) = current_step.on_success.as_deref().and_then(|a| a.first()) {
+                    if let Some(on_success) =
+                        current_step.on_success.as_deref().and_then(|a| a.first())
+                    {
                         output.push_str(&render_action(
                             &current_step.step_id,
                             &current_step.success_criteria,
@@ -46,7 +48,9 @@ impl Renderer for MermaidFlowchart {
                         ));
                     }
 
-                    if let Some(on_failure) = current_step.on_failure.as_deref().and_then(|a| a.first()) {
+                    if let Some(on_failure) =
+                        current_step.on_failure.as_deref().and_then(|a| a.first())
+                    {
                         output.push_str(&render_action(
                             &current_step.step_id,
                             &current_step.success_criteria,
@@ -98,10 +102,7 @@ fn render_action(
     let has_criteria = action.criteria.is_some();
 
     if has_criteria {
-        let to_rhombus_node = rhombus_node(
-            &format!("{}", action.name),
-            &action.criteria,
-        );
+        let to_rhombus_node = rhombus_node(&format!("{}", action.name), &action.criteria);
 
         output.push_str(&to_rhombus_from_rhombus(
             &from_rhombus_node,
@@ -115,7 +116,9 @@ fn render_action(
 
     match action.action_type {
         ActionType::Goto => {
-            if let Some(action_target_id) = action.workflow_id.as_deref().or(action.step_id.as_deref()) {
+            if let Some(action_target_id) =
+                action.workflow_id.as_deref().or(action.step_id.as_deref())
+            {
                 output.push_str(&to_rectangle_from_rhombus(
                     &from_rhombus_node,
                     &rectangle_node(action_target_id, &None),
@@ -284,7 +287,6 @@ mod tests {
     use super::*;
     use crate::arazzo::{Criteria, Info, Workflow};
 
-    // TODO: Include on_action.criteria validation
     #[test]
     fn render_full() {
         let arazzo = ArazzoDocument {
@@ -370,14 +372,20 @@ mod tests {
                                 action_type: ActionType::Goto,
                                 workflow_id: None,
                                 step_id: Some(String::from("stepBar")),
-                                criteria: None,
+                                criteria: Some(vec![Criteria {
+                                    condition: Some(String::from(
+                                        "$response.body.status == 'approved'",
+                                    )),
+                                }]),
                             }]),
                             on_failure: Some(vec![Action {
                                 name: String::from("proceedToStepBaz"),
                                 action_type: ActionType::Goto,
                                 workflow_id: None,
                                 step_id: Some(String::from("stepBaz")),
-                                criteria: None,
+                                criteria: Some(vec![Criteria {
+                                    condition: Some(String::from("$response.body.error != null")),
+                                }]),
                             }]),
                         },
                         Step {
@@ -435,8 +443,12 @@ mod tests {
             "    end\n",
             "    subgraph workflowBar[\"Workflow bar's description.\"]\n",
             "    stepFoo[\"Step foo's description.\"] --> stepFooNode{$statusCode == 200}\n",
-            "    stepFooNode{$statusCode == 200} -->|true| stepBar\n",
-            "    stepFooNode{$statusCode == 200} -->|false| stepBaz\n",
+            "    stepFooNode{$statusCode == 200} -->|true| proceedToStepBarNode{$response.body.status == 'approved'}\n",
+            "    proceedToStepBarNode{$response.body.status == 'approved'} -->|true| stepBar\n",
+            "    proceedToStepBarNode{$response.body.status == 'approved'} -->|false| workflowBarEndNode((End))\n",
+            "    stepFooNode{$statusCode == 200} -->|false| proceedToStepBazNode{$response.body.error != null}\n",
+            "    proceedToStepBazNode{$response.body.error != null} -->|true| stepBaz\n",
+            "    proceedToStepBazNode{$response.body.error != null} -->|false| workflowBarEndNode((End))\n",
             "    stepBar[\"Step bar's description.\"] --> stepBarNode{$statusCode == 200}\n",
             "    stepBarNode{$statusCode == 200} -->|true| workflowBarEndNode((End))\n",
             "    stepBarNode{$statusCode == 200} -->|false| stepBaz\n",
@@ -1052,47 +1064,7 @@ mod tests {
     }
 
     #[test]
-    fn render_on_success_omitted_on_last_node() {
-        let arazzo = ArazzoDocument {
-            info: Info {
-                title: String::from("Workflows"),
-            },
-            workflows: vec![Workflow {
-                workflow_id: String::from("workflowFoo"),
-                description: None,
-                steps: vec![Step {
-                    step_id: String::from("stepFoo"),
-                    description: None,
-                    success_criteria: Some(vec![Criteria {
-                        condition: Some(String::from("$statusCode == 200")),
-                    }]),
-                    on_success: None,
-                    on_failure: None,
-                }],
-            }],
-        };
-
-        let sut = MermaidFlowchart;
-
-        let actual = sut.render(&arazzo);
-
-        let expected = concat!(
-            "---\n",
-            "title: Workflows\n",
-            "---\n",
-            "flowchart TD\n",
-            "    subgraph workflowFoo\n",
-            "    stepFoo --> stepFooNode{$statusCode == 200}\n",
-            "    stepFooNode{$statusCode == 200} -->|true| workflowFooEndNode((End))\n",
-            "    stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
-            "    end\n",
-        );
-
-        assert_eq!(expected, actual);
-    }
-
-    #[test]
-    fn render_multiple_success_criteria() {
+    fn render_success_criteria_defined_with_multiple_criteria() {
         let arazzo = ArazzoDocument {
             info: Info {
                 title: String::from("Workflows"),
@@ -1147,7 +1119,141 @@ mod tests {
     }
 
     #[test]
-    fn render_action_criteria() {
+    fn render_success_criteria_defined_with_empty_criteria() {
+        let arazzo = ArazzoDocument {
+            info: Info {
+                title: String::from("Workflows"),
+            },
+            workflows: vec![Workflow {
+                workflow_id: String::from("workflowFoo"),
+                description: None,
+                steps: vec![
+                    Step {
+                        step_id: String::from("stepFoo"),
+                        description: None,
+                        success_criteria: Some(vec![]),
+                        on_success: None,
+                        on_failure: None,
+                    },
+                    Step {
+                        step_id: String::from("stepBar"),
+                        description: None,
+                        success_criteria: None,
+                        on_success: None,
+                        on_failure: None,
+                    },
+                ],
+            }],
+        };
+
+        let sut = MermaidFlowchart;
+
+        let actual = sut.render(&arazzo);
+
+        let expected = concat!(
+            "---\n",
+            "title: Workflows\n",
+            "---\n",
+            "flowchart TD\n",
+            "    subgraph workflowFoo\n",
+            "    stepFoo --> stepFooNode\n",
+            "    stepFooNode -->|true| stepBar\n",
+            "    stepFooNode -->|false| workflowFooEndNode((End))\n",
+            "    stepBar --> workflowFooEndNode((End))\n",
+            "    end\n",
+        );
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn render_success_criteria_defined_on_success_defined_as_action_type_end() {
+        let arazzo = ArazzoDocument {
+            info: Info {
+                title: String::from("Workflows"),
+            },
+            workflows: vec![Workflow {
+                workflow_id: String::from("workflowFoo"),
+                description: None,
+                steps: vec![Step {
+                    step_id: String::from("stepFoo"),
+                    description: None,
+                    success_criteria: Some(vec![Criteria {
+                        condition: Some(String::from("$statusCode == 200")),
+                    }]),
+                    on_success: Some(vec![Action {
+                        name: String::from("done"),
+                        action_type: ActionType::End,
+                        workflow_id: None,
+                        step_id: None,
+                        criteria: None,
+                    }]),
+                    on_failure: None,
+                }],
+            }],
+        };
+
+        let sut = MermaidFlowchart;
+
+        let actual = sut.render(&arazzo);
+
+        let expected = concat!(
+            "---\n",
+            "title: Workflows\n",
+            "---\n",
+            "flowchart TD\n",
+            "    subgraph workflowFoo\n",
+            "    stepFoo --> stepFooNode{$statusCode == 200}\n",
+            "    stepFooNode{$statusCode == 200} -->|true| workflowFooEndNode((End))\n",
+            "    stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
+            "    end\n",
+        );
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn render_success_criteria_defined_on_success_omitted_on_last_node() {
+        let arazzo = ArazzoDocument {
+            info: Info {
+                title: String::from("Workflows"),
+            },
+            workflows: vec![Workflow {
+                workflow_id: String::from("workflowFoo"),
+                description: None,
+                steps: vec![Step {
+                    step_id: String::from("stepFoo"),
+                    description: None,
+                    success_criteria: Some(vec![Criteria {
+                        condition: Some(String::from("$statusCode == 200")),
+                    }]),
+                    on_success: None,
+                    on_failure: None,
+                }],
+            }],
+        };
+
+        let sut = MermaidFlowchart;
+
+        let actual = sut.render(&arazzo);
+
+        let expected = concat!(
+            "---\n",
+            "title: Workflows\n",
+            "---\n",
+            "flowchart TD\n",
+            "    subgraph workflowFoo\n",
+            "    stepFoo --> stepFooNode{$statusCode == 200}\n",
+            "    stepFooNode{$statusCode == 200} -->|true| workflowFooEndNode((End))\n",
+            "    stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
+            "    end\n",
+        );
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn render_on_action() {
         let arazzo = ArazzoDocument {
             info: Info {
                 title: String::from("Workflows"),
@@ -1174,10 +1280,10 @@ mod tests {
                             }]),
                         }]),
                         on_failure: Some(vec![Action {
-                            name: String::from("proceedToStepBaz"),
-                            action_type: ActionType::Goto,
+                            name: String::from("done"),
+                            action_type: ActionType::End,
                             workflow_id: None,
-                            step_id: Some(String::from("stepBaz")),
+                            step_id: None,
                             criteria: Some(vec![Criteria {
                                 condition: Some(String::from("$response.body.error != null")),
                             }]),
@@ -1215,9 +1321,9 @@ mod tests {
             "    stepFooNode{$statusCode == 200} -->|true| proceedToStepBarNode{$response.body.status == 'approved'}\n",
             "    proceedToStepBarNode{$response.body.status == 'approved'} -->|true| stepBar\n",
             "    proceedToStepBarNode{$response.body.status == 'approved'} -->|false| workflowFooEndNode((End))\n",
-            "    stepFooNode{$statusCode == 200} -->|false| proceedToStepBazNode{$response.body.error != null}\n",
-            "    proceedToStepBazNode{$response.body.error != null} -->|true| stepBaz\n",
-            "    proceedToStepBazNode{$response.body.error != null} -->|false| workflowFooEndNode((End))\n",
+            "    stepFooNode{$statusCode == 200} -->|false| doneNode{$response.body.error != null}\n",
+            "    doneNode{$response.body.error != null} -->|true| workflowFooEndNode((End))\n",
+            "    doneNode{$response.body.error != null} -->|false| workflowFooEndNode((End))\n",
             "    stepBar --> stepBaz\n",
             "    stepBaz --> workflowFooEndNode((End))\n",
             "    end\n",
@@ -1227,7 +1333,299 @@ mod tests {
     }
 
     #[test]
-    fn render_multiple_action_criteria() {
+    fn render_on_action_goto() {
+        let arazzo = ArazzoDocument {
+            info: Info {
+                title: String::from("Workflows"),
+            },
+            workflows: vec![Workflow {
+                workflow_id: String::from("workflowFoo"),
+                description: None,
+                steps: vec![
+                    Step {
+                        step_id: String::from("stepFoo"),
+                        description: None,
+                        success_criteria: Some(vec![Criteria {
+                            condition: Some(String::from("$statusCode == 200")),
+                        }]),
+                        on_success: Some(vec![Action {
+                            name: String::from("proceedToStepBar"),
+                            action_type: ActionType::Goto,
+                            workflow_id: None,
+                            step_id: Some(String::from("stepBar")),
+                            criteria: Some(vec![Criteria {
+                                condition: Some(String::from(
+                                    "$response.body.status == 'approved'",
+                                )),
+                            }]),
+                        }]),
+                        on_failure: None,
+                    },
+                    Step {
+                        step_id: String::from("stepBar"),
+                        description: None,
+                        success_criteria: None,
+                        on_success: None,
+                        on_failure: None,
+                    },
+                ],
+            }],
+        };
+
+        let sut = MermaidFlowchart;
+
+        let actual = sut.render(&arazzo);
+
+        let expected = concat!(
+            "---\n",
+            "title: Workflows\n",
+            "---\n",
+            "flowchart TD\n",
+            "    subgraph workflowFoo\n",
+            "    stepFoo --> stepFooNode{$statusCode == 200}\n",
+            "    stepFooNode{$statusCode == 200} -->|true| proceedToStepBarNode{$response.body.status == 'approved'}\n",
+            "    proceedToStepBarNode{$response.body.status == 'approved'} -->|true| stepBar\n",
+            "    proceedToStepBarNode{$response.body.status == 'approved'} -->|false| workflowFooEndNode((End))\n",
+            "    stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
+            "    stepBar --> workflowFooEndNode((End))\n",
+            "    end\n",
+        );
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn render_on_action_end() {
+        let arazzo = ArazzoDocument {
+            info: Info {
+                title: String::from("Workflows"),
+            },
+            workflows: vec![Workflow {
+                workflow_id: String::from("workflowFoo"),
+                description: None,
+                steps: vec![Step {
+                    step_id: String::from("stepFoo"),
+                    description: None,
+                    success_criteria: Some(vec![Criteria {
+                        condition: Some(String::from("$statusCode == 200")),
+                    }]),
+                    on_success: Some(vec![Action {
+                        name: String::from("done"),
+                        action_type: ActionType::End,
+                        workflow_id: None,
+                        step_id: None,
+                        criteria: Some(vec![Criteria {
+                            condition: Some(String::from("$response.body.status == 'approved'")),
+                        }]),
+                    }]),
+                    on_failure: None,
+                }],
+            }],
+        };
+
+        let sut = MermaidFlowchart;
+
+        let actual = sut.render(&arazzo);
+
+        let expected = concat!(
+            "---\n",
+            "title: Workflows\n",
+            "---\n",
+            "flowchart TD\n",
+            "    subgraph workflowFoo\n",
+            "    stepFoo --> stepFooNode{$statusCode == 200}\n",
+            "    stepFooNode{$statusCode == 200} -->|true| doneNode{$response.body.status == 'approved'}\n",
+            "    doneNode{$response.body.status == 'approved'} -->|true| workflowFooEndNode((End))\n",
+            "    doneNode{$response.body.status == 'approved'} -->|false| workflowFooEndNode((End))\n",
+            "    stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
+            "    end\n",
+        );
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn render_on_action_on_success_only() {
+        let arazzo = ArazzoDocument {
+            info: Info {
+                title: String::from("Workflows"),
+            },
+            workflows: vec![Workflow {
+                workflow_id: String::from("workflowFoo"),
+                description: None,
+                steps: vec![
+                    Step {
+                        step_id: String::from("stepFoo"),
+                        description: None,
+                        success_criteria: Some(vec![Criteria {
+                            condition: Some(String::from("$statusCode == 200")),
+                        }]),
+                        on_success: Some(vec![Action {
+                            name: String::from("proceedToStepBar"),
+                            action_type: ActionType::Goto,
+                            workflow_id: None,
+                            step_id: Some(String::from("stepBar")),
+                            criteria: Some(vec![Criteria {
+                                condition: Some(String::from(
+                                    "$response.body.status == 'approved'",
+                                )),
+                            }]),
+                        }]),
+                        on_failure: None,
+                    },
+                    Step {
+                        step_id: String::from("stepBar"),
+                        description: None,
+                        success_criteria: None,
+                        on_success: None,
+                        on_failure: None,
+                    },
+                ],
+            }],
+        };
+
+        let sut = MermaidFlowchart;
+
+        let actual = sut.render(&arazzo);
+
+        let expected = concat!(
+            "---\n",
+            "title: Workflows\n",
+            "---\n",
+            "flowchart TD\n",
+            "    subgraph workflowFoo\n",
+            "    stepFoo --> stepFooNode{$statusCode == 200}\n",
+            "    stepFooNode{$statusCode == 200} -->|true| proceedToStepBarNode{$response.body.status == 'approved'}\n",
+            "    proceedToStepBarNode{$response.body.status == 'approved'} -->|true| stepBar\n",
+            "    proceedToStepBarNode{$response.body.status == 'approved'} -->|false| workflowFooEndNode((End))\n",
+            "    stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
+            "    stepBar --> workflowFooEndNode((End))\n",
+            "    end\n",
+        );
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn render_on_action_on_failure_only() {
+        let arazzo = ArazzoDocument {
+            info: Info {
+                title: String::from("Workflows"),
+            },
+            workflows: vec![Workflow {
+                workflow_id: String::from("workflowFoo"),
+                description: None,
+                steps: vec![
+                    Step {
+                        step_id: String::from("stepFoo"),
+                        description: None,
+                        success_criteria: Some(vec![Criteria {
+                            condition: Some(String::from("$statusCode == 200")),
+                        }]),
+                        on_success: None,
+                        on_failure: Some(vec![Action {
+                            name: String::from("proceedToStepBar"),
+                            action_type: ActionType::Goto,
+                            workflow_id: None,
+                            step_id: Some(String::from("stepBar")),
+                            criteria: Some(vec![Criteria {
+                                condition: Some(String::from("$response.body.error != null")),
+                            }]),
+                        }]),
+                    },
+                    Step {
+                        step_id: String::from("stepBar"),
+                        description: None,
+                        success_criteria: None,
+                        on_success: None,
+                        on_failure: None,
+                    },
+                ],
+            }],
+        };
+
+        let sut = MermaidFlowchart;
+
+        let actual = sut.render(&arazzo);
+
+        let expected = concat!(
+            "---\n",
+            "title: Workflows\n",
+            "---\n",
+            "flowchart TD\n",
+            "    subgraph workflowFoo\n",
+            "    stepFoo --> stepFooNode{$statusCode == 200}\n",
+            "    stepFooNode{$statusCode == 200} -->|true| stepBar\n",
+            "    stepFooNode{$statusCode == 200} -->|false| proceedToStepBarNode{$response.body.error != null}\n",
+            "    proceedToStepBarNode{$response.body.error != null} -->|true| stepBar\n",
+            "    proceedToStepBarNode{$response.body.error != null} -->|false| workflowFooEndNode((End))\n",
+            "    stepBar --> workflowFooEndNode((End))\n",
+            "    end\n",
+        );
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn render_on_action_with_empty_criteria() {
+        let arazzo = ArazzoDocument {
+            info: Info {
+                title: String::from("Workflows"),
+            },
+            workflows: vec![Workflow {
+                workflow_id: String::from("workflowFoo"),
+                description: None,
+                steps: vec![
+                    Step {
+                        step_id: String::from("stepFoo"),
+                        description: None,
+                        success_criteria: Some(vec![Criteria {
+                            condition: Some(String::from("$statusCode == 200")),
+                        }]),
+                        on_success: Some(vec![Action {
+                            name: String::from("proceedToStepBar"),
+                            action_type: ActionType::Goto,
+                            workflow_id: None,
+                            step_id: Some(String::from("stepBar")),
+                            criteria: Some(vec![]),
+                        }]),
+                        on_failure: None,
+                    },
+                    Step {
+                        step_id: String::from("stepBar"),
+                        description: None,
+                        success_criteria: None,
+                        on_success: None,
+                        on_failure: None,
+                    },
+                ],
+            }],
+        };
+
+        let sut = MermaidFlowchart;
+
+        let actual = sut.render(&arazzo);
+
+        let expected = concat!(
+            "---\n",
+            "title: Workflows\n",
+            "---\n",
+            "flowchart TD\n",
+            "    subgraph workflowFoo\n",
+            "    stepFoo --> stepFooNode{$statusCode == 200}\n",
+            "    stepFooNode{$statusCode == 200} -->|true| proceedToStepBarNode\n",
+            "    proceedToStepBarNode -->|true| stepBar\n",
+            "    proceedToStepBarNode -->|false| workflowFooEndNode((End))\n",
+            "    stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
+            "    stepBar --> workflowFooEndNode((End))\n",
+            "    end\n",
+        );
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn render_on_action_with_multiple_action_criteria() {
         let arazzo = ArazzoDocument {
             info: Info {
                 title: String::from("Workflows"),
@@ -1252,7 +1650,7 @@ mod tests {
                                     )),
                                 },
                                 Criteria {
-                                    condition: Some(String::from("$response.body.error != null")),
+                                    condition: Some(String::from("$response.body.error == null")),
                                 },
                             ]),
                         }]),
@@ -1280,9 +1678,9 @@ mod tests {
             "flowchart TD\n",
             "    subgraph workflowFoo\n",
             "    stepFoo --> stepFooNode\n",
-            "    stepFooNode -->|true| proceedToStepBarNode{$response.body.status == 'approved' && $response.body.error != null}\n",
-            "    proceedToStepBarNode{$response.body.status == 'approved' && $response.body.error != null} -->|true| stepBar\n",
-            "    proceedToStepBarNode{$response.body.status == 'approved' && $response.body.error != null} -->|false| workflowFooEndNode((End))\n",
+            "    stepFooNode -->|true| proceedToStepBarNode{$response.body.status == 'approved' && $response.body.error == null}\n",
+            "    proceedToStepBarNode{$response.body.status == 'approved' && $response.body.error == null} -->|true| stepBar\n",
+            "    proceedToStepBarNode{$response.body.status == 'approved' && $response.body.error == null} -->|false| workflowFooEndNode((End))\n",
             "    stepFooNode -->|false| workflowFooEndNode((End))\n",
             "    stepBar --> workflowFooEndNode((End))\n",
             "    end\n",
