@@ -40,6 +40,7 @@ pub struct Criteria {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Action {
+    pub name: String,
     #[serde(rename = "type")]
     pub action_type: ActionType,
     pub workflow_id: Option<String>,
