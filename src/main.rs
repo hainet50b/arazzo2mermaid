@@ -1,7 +1,8 @@
-use clap::Parser;
 use crate::arazzo::ArazzoDocument;
 use crate::renderer::{MermaidFlowchart, Renderer};
+use clap::Parser;
 use std::error::Error;
+use std::fmt::Display;
 use std::io::Read;
 use std::{fs, io};
 
@@ -20,26 +21,70 @@ struct Arazzo2Mermaid {
     output: Option<String>,
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+#[derive(Debug)]
+enum Arazzo2MermaidError {
+    Io(io::Error),
+    Yaml(yaml_serde::Error),
+}
+
+impl Display for Arazzo2MermaidError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Arazzo2MermaidError::Io(error) => write!(f, "Failed to read or write file: {}", error),
+            Arazzo2MermaidError::Yaml(error) => write!(f, "Failed to parse YAML: {}", error),
+        }
+    }
+}
+
+impl Error for Arazzo2MermaidError {}
+
+impl From<io::Error> for Arazzo2MermaidError {
+    fn from(error: io::Error) -> Self {
+        Arazzo2MermaidError::Io(error)
+    }
+}
+
+impl From<yaml_serde::Error> for Arazzo2MermaidError {
+    fn from(error: yaml_serde::Error) -> Self {
+        Arazzo2MermaidError::Yaml(error)
+    }
+}
+
+fn main() {
     let cli = Arazzo2Mermaid::parse();
 
     let reader: Box<dyn Read> = match cli.file.as_deref() {
         Some("-") | None => Box::new(io::stdin()),
-        Some(file) => Box::new(fs::File::open(file)?),
+        Some(file) => {
+            match fs::File::open(file) {
+                Ok(file) => Box::new(file),
+                Err(error) => {
+                    eprintln!("{}", Arazzo2MermaidError::Io(error));
+                    std::process::exit(1);
+                }
+            }
+        },
     };
 
-    let mermaid = run(reader)?;
-
-    if let Some(file) = cli.output.as_deref() {
-        fs::write(file, mermaid)?;
-    } else {
-        print!("{}", mermaid);
-    }
-
-    Ok(())
+    match run(reader) {
+        Ok(mermaid) => {
+            if let Some(file) = cli.output.as_deref() {
+                if let Err(error) = fs::write(file, mermaid) {
+                    eprintln!("{}", Arazzo2MermaidError::Io(error));
+                    std::process::exit(1);
+                }
+            } else {
+                print!("{}", mermaid);
+            }
+        }
+        Err(error) => {
+            eprintln!("{}", error);
+            std::process::exit(1);
+        }
+    };
 }
 
-fn run(mut reader: impl Read) -> Result<String, Box<dyn Error>> {
+fn run(mut reader: impl Read) -> Result<String, Arazzo2MermaidError> {
     let mut content = String::new();
     reader.read_to_string(&mut content)?;
 

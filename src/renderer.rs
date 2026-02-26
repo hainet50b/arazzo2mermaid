@@ -102,7 +102,7 @@ fn render_action(
     let has_criteria = action.criteria.is_some();
 
     if has_criteria {
-        let to_rhombus_node = rhombus_node(&format!("{}", action.name), &action.criteria);
+        let to_rhombus_node = rhombus_node(&action.name, &action.criteria);
 
         output.push_str(&to_rhombus_from_rhombus(
             &from_rhombus_node,
