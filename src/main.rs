@@ -1,10 +1,12 @@
+use std::error::Error;
+use std::fmt::{self, Display};
+use std::io::{self, Read};
+use std::{fs, process};
+
+use clap::Parser;
+
 use crate::arazzo::ArazzoDocument;
 use crate::renderer::{MermaidFlowchart, Renderer};
-use clap::Parser;
-use std::error::Error;
-use std::fmt::Display;
-use std::io::Read;
-use std::{fs, io};
 
 mod arazzo;
 mod renderer;
@@ -28,7 +30,7 @@ enum Arazzo2MermaidError {
 }
 
 impl Display for Arazzo2MermaidError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Arazzo2MermaidError::Io(error) => write!(f, "Failed to read or write file: {}", error),
             Arazzo2MermaidError::Yaml(error) => write!(f, "Failed to parse YAML: {}", error),
@@ -55,13 +57,11 @@ fn main() {
 
     let reader: Box<dyn Read> = match cli.file.as_deref() {
         Some("-") | None => Box::new(io::stdin()),
-        Some(file) => {
-            match fs::File::open(file) {
-                Ok(file) => Box::new(file),
-                Err(error) => {
-                    eprintln!("{}", Arazzo2MermaidError::Io(error));
-                    std::process::exit(1);
-                }
+        Some(file) => match fs::File::open(file) {
+            Ok(file) => Box::new(file),
+            Err(error) => {
+                eprintln!("{}", Arazzo2MermaidError::Io(error));
+                process::exit(1);
             }
         },
     };
@@ -71,7 +71,7 @@ fn main() {
             if let Some(file) = cli.output.as_deref() {
                 if let Err(error) = fs::write(file, mermaid) {
                     eprintln!("{}", Arazzo2MermaidError::Io(error));
-                    std::process::exit(1);
+                    process::exit(1);
                 }
             } else {
                 print!("{}", mermaid);
@@ -79,7 +79,7 @@ fn main() {
         }
         Err(error) => {
             eprintln!("{}", error);
-            std::process::exit(1);
+            process::exit(1);
         }
     };
 }
