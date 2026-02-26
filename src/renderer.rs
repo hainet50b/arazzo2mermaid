@@ -20,8 +20,14 @@ impl Renderer for MermaidFlowchart {
             for (i, current_step) in workflow.steps.iter().enumerate() {
                 if should_branch(current_step) {
                     output.push_str(&to_rhombus_from_rectangle(
-                        &rectangle_node(&current_step.step_id, &current_step.description),
-                        &rhombus_node(&current_step.step_id, &current_step.success_criteria),
+                        &rectangle_node(
+                            &format!("{}_{}", workflow.workflow_id, current_step.step_id),
+                            &current_step.description,
+                        ),
+                        &rhombus_node(
+                            &format!("{}_{}", workflow.workflow_id, current_step.step_id),
+                            &current_step.success_criteria,
+                        ),
                     ));
 
                     if let Some(on_success) =
@@ -36,13 +42,22 @@ impl Renderer for MermaidFlowchart {
                         ));
                     } else if let Some(next_step) = &workflow.steps.get(i + 1) {
                         output.push_str(&to_rectangle_from_rhombus(
-                            &rhombus_node(&current_step.step_id, &current_step.success_criteria),
-                            &rectangle_node(&next_step.step_id, &next_step.description),
+                            &rhombus_node(
+                                &format!("{}_{}", workflow.workflow_id, current_step.step_id),
+                                &current_step.success_criteria,
+                            ),
+                            &rectangle_node(
+                                &format!("{}_{}", workflow.workflow_id, next_step.step_id),
+                                &next_step.description,
+                            ),
                             Verdict::Ok,
                         ));
                     } else {
                         output.push_str(&to_end_from_rhombus(
-                            &rhombus_node(&current_step.step_id, &current_step.success_criteria),
+                            &rhombus_node(
+                                &format!("{}_{}", workflow.workflow_id, current_step.step_id),
+                                &current_step.success_criteria,
+                            ),
                             &end_node(&workflow.workflow_id),
                             Verdict::Ok,
                         ));
@@ -60,19 +75,31 @@ impl Renderer for MermaidFlowchart {
                         ));
                     } else {
                         output.push_str(&to_end_from_rhombus(
-                            &rhombus_node(&current_step.step_id, &current_step.success_criteria),
+                            &rhombus_node(
+                                &format!("{}_{}", workflow.workflow_id, current_step.step_id),
+                                &current_step.success_criteria,
+                            ),
                             &end_node(&workflow.workflow_id),
                             Verdict::Ng,
                         ));
                     }
                 } else if let Some(next_step) = &workflow.steps.get(i + 1) {
                     output.push_str(&to_rectangle_from_rectangle(
-                        &rectangle_node(&current_step.step_id, &current_step.description),
-                        &rectangle_node(&next_step.step_id, &next_step.description),
+                        &rectangle_node(
+                            &format!("{}_{}", workflow.workflow_id, current_step.step_id),
+                            &current_step.description,
+                        ),
+                        &rectangle_node(
+                            &format!("{}_{}", workflow.workflow_id, next_step.step_id),
+                            &next_step.description,
+                        ),
                     ));
                 } else {
                     output.push_str(&to_end_from_rectangle(
-                        &rectangle_node(&current_step.step_id, &current_step.description),
+                        &rectangle_node(
+                            &format!("{}_{}", workflow.workflow_id, current_step.step_id),
+                            &current_step.description,
+                        ),
                         &end_node(&workflow.workflow_id),
                     ));
                 }
@@ -94,7 +121,8 @@ fn render_action(
 ) -> String {
     let mut output = String::new();
 
-    let mut from_rhombus_node = rhombus_node(step_id, success_criteria);
+    let mut from_rhombus_node =
+        rhombus_node(&format!("{}_{}", workflow_id, step_id), success_criteria);
     let mut verdict = match action_side {
         ActionSide::OnSuccess => Verdict::Ok,
         ActionSide::OnFailure => Verdict::Ng,
@@ -102,7 +130,8 @@ fn render_action(
     let has_criteria = action.criteria.is_some();
 
     if has_criteria {
-        let to_rhombus_node = rhombus_node(&action.name, &action.criteria);
+        let to_rhombus_node =
+            rhombus_node(&format!("{}_{}", workflow_id, action.name), &action.criteria);
 
         output.push_str(&to_rhombus_from_rhombus(
             &from_rhombus_node,
@@ -116,12 +145,16 @@ fn render_action(
 
     match action.action_type {
         ActionType::Goto => {
-            if let Some(action_target_id) =
-                action.workflow_id.as_deref().or(action.step_id.as_deref())
-            {
+            if let Some(action_workflow_id) = action.workflow_id.as_deref() {
                 output.push_str(&to_rectangle_from_rhombus(
                     &from_rhombus_node,
-                    &rectangle_node(action_target_id, &None),
+                    &rectangle_node(action_workflow_id, &None),
+                    verdict,
+                ));
+            } else if let Some(action_step_id) = action.step_id.as_deref() {
+                output.push_str(&to_rectangle_from_rhombus(
+                    &from_rhombus_node,
+                    &rectangle_node(&format!("{}_{}", workflow_id, action_step_id), &None),
                     verdict,
                 ));
             }
@@ -431,28 +464,28 @@ mod tests {
             "---\n",
             "flowchart TD\n",
             "    subgraph workflowFoo[\"Workflow foo's description.\"]\n",
-            "    stepFoo[\"Step foo's description.\"] --> stepFooNode{$statusCode == 200}\n",
-            "    stepFooNode{$statusCode == 200} -->|true| stepBar\n",
-            "    stepFooNode{$statusCode == 200} -->|false| stepBaz\n",
-            "    stepBar[\"Step bar's description.\"] --> stepBarNode{$statusCode == 200}\n",
-            "    stepBarNode{$statusCode == 200} -->|true| workflowFooEndNode((End))\n",
-            "    stepBarNode{$statusCode == 200} -->|false| stepBaz\n",
-            "    stepBaz[\"Step baz's description.\"] --> stepBazNode{$statusCode == 200}\n",
-            "    stepBazNode{$statusCode == 200} -->|true| workflowBar\n",
-            "    stepBazNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFoo[\"Step foo's description.\"] --> workflowFoo_stepFooNode{$statusCode == 200}\n",
+            "    workflowFoo_stepFooNode{$statusCode == 200} -->|true| workflowFoo_stepBar\n",
+            "    workflowFoo_stepFooNode{$statusCode == 200} -->|false| workflowFoo_stepBaz\n",
+            "    workflowFoo_stepBar[\"Step bar's description.\"] --> workflowFoo_stepBarNode{$statusCode == 200}\n",
+            "    workflowFoo_stepBarNode{$statusCode == 200} -->|true| workflowFooEndNode((End))\n",
+            "    workflowFoo_stepBarNode{$statusCode == 200} -->|false| workflowFoo_stepBaz\n",
+            "    workflowFoo_stepBaz[\"Step baz's description.\"] --> workflowFoo_stepBazNode{$statusCode == 200}\n",
+            "    workflowFoo_stepBazNode{$statusCode == 200} -->|true| workflowBar\n",
+            "    workflowFoo_stepBazNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
             "    end\n",
             "    subgraph workflowBar[\"Workflow bar's description.\"]\n",
-            "    stepFoo[\"Step foo's description.\"] --> stepFooNode{$statusCode == 200}\n",
-            "    stepFooNode{$statusCode == 200} -->|true| proceedToStepBarNode{$response.body.status == 'approved'}\n",
-            "    proceedToStepBarNode{$response.body.status == 'approved'} -->|true| stepBar\n",
-            "    proceedToStepBarNode{$response.body.status == 'approved'} -->|false| workflowBarEndNode((End))\n",
-            "    stepFooNode{$statusCode == 200} -->|false| proceedToStepBazNode{$response.body.error != null}\n",
-            "    proceedToStepBazNode{$response.body.error != null} -->|true| stepBaz\n",
-            "    proceedToStepBazNode{$response.body.error != null} -->|false| workflowBarEndNode((End))\n",
-            "    stepBar[\"Step bar's description.\"] --> stepBarNode{$statusCode == 200}\n",
-            "    stepBarNode{$statusCode == 200} -->|true| workflowBarEndNode((End))\n",
-            "    stepBarNode{$statusCode == 200} -->|false| stepBaz\n",
-            "    stepBaz[\"Step baz's description.\"] --> workflowBarEndNode((End))\n",
+            "    workflowBar_stepFoo[\"Step foo's description.\"] --> workflowBar_stepFooNode{$statusCode == 200}\n",
+            "    workflowBar_stepFooNode{$statusCode == 200} -->|true| workflowBar_proceedToStepBarNode{$response.body.status == 'approved'}\n",
+            "    workflowBar_proceedToStepBarNode{$response.body.status == 'approved'} -->|true| workflowBar_stepBar\n",
+            "    workflowBar_proceedToStepBarNode{$response.body.status == 'approved'} -->|false| workflowBarEndNode((End))\n",
+            "    workflowBar_stepFooNode{$statusCode == 200} -->|false| workflowBar_proceedToStepBazNode{$response.body.error != null}\n",
+            "    workflowBar_proceedToStepBazNode{$response.body.error != null} -->|true| workflowBar_stepBaz\n",
+            "    workflowBar_proceedToStepBazNode{$response.body.error != null} -->|false| workflowBarEndNode((End))\n",
+            "    workflowBar_stepBar[\"Step bar's description.\"] --> workflowBar_stepBarNode{$statusCode == 200}\n",
+            "    workflowBar_stepBarNode{$statusCode == 200} -->|true| workflowBarEndNode((End))\n",
+            "    workflowBar_stepBarNode{$statusCode == 200} -->|false| workflowBar_stepBaz\n",
+            "    workflowBar_stepBaz[\"Step baz's description.\"] --> workflowBarEndNode((End))\n",
             "    end\n",
         );
 
@@ -502,10 +535,10 @@ mod tests {
             "---\n",
             "flowchart TD\n",
             "    subgraph workflowFoo\n",
-            "    stepFoo --> workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFoo --> workflowFooEndNode((End))\n",
             "    end\n",
             "    subgraph workflowBar\n",
-            "    stepFoo --> workflowBarEndNode((End))\n",
+            "    workflowBar_stepFoo --> workflowBarEndNode((End))\n",
             "    end\n",
         );
 
@@ -551,8 +584,8 @@ mod tests {
             "---\n",
             "flowchart TD\n",
             "    subgraph workflowFoo\n",
-            "    stepFoo --> stepBar\n",
-            "    stepBar --> workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFoo --> workflowFoo_stepBar\n",
+            "    workflowFoo_stepBar --> workflowFooEndNode((End))\n",
             "    end\n",
         );
 
@@ -589,7 +622,7 @@ mod tests {
             "---\n",
             "flowchart TD\n",
             "    subgraph workflowFoo\n",
-            "    stepFoo --> workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFoo --> workflowFooEndNode((End))\n",
             "    end\n",
         );
 
@@ -656,11 +689,11 @@ mod tests {
             "---\n",
             "flowchart TD\n",
             "    subgraph workflowFoo\n",
-            "    stepFoo --> stepFooNode{$statusCode == 200}\n",
-            "    stepFooNode{$statusCode == 200} -->|true| stepBar\n",
-            "    stepFooNode{$statusCode == 200} -->|false| stepBaz\n",
-            "    stepBar --> stepBaz\n",
-            "    stepBaz --> workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFoo --> workflowFoo_stepFooNode{$statusCode == 200}\n",
+            "    workflowFoo_stepFooNode{$statusCode == 200} -->|true| workflowFoo_stepBar\n",
+            "    workflowFoo_stepFooNode{$statusCode == 200} -->|false| workflowFoo_stepBaz\n",
+            "    workflowFoo_stepBar --> workflowFoo_stepBaz\n",
+            "    workflowFoo_stepBaz --> workflowFooEndNode((End))\n",
             "    end\n",
         );
 
@@ -714,10 +747,10 @@ mod tests {
             "---\n",
             "flowchart TD\n",
             "    subgraph workflowFoo\n",
-            "    stepFoo --> stepFooNode{$statusCode == 200}\n",
-            "    stepFooNode{$statusCode == 200} -->|true| stepBar\n",
-            "    stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
-            "    stepBar --> workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFoo --> workflowFoo_stepFooNode{$statusCode == 200}\n",
+            "    workflowFoo_stepFooNode{$statusCode == 200} -->|true| workflowFoo_stepBar\n",
+            "    workflowFoo_stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
+            "    workflowFoo_stepBar --> workflowFooEndNode((End))\n",
             "    end\n",
         );
 
@@ -778,11 +811,11 @@ mod tests {
             "---\n",
             "flowchart TD\n",
             "    subgraph workflowFoo\n",
-            "    stepFoo --> stepFooNode{$statusCode == 200}\n",
-            "    stepFooNode{$statusCode == 200} -->|true| stepBar\n",
-            "    stepFooNode{$statusCode == 200} -->|false| stepBaz\n",
-            "    stepBar --> stepBaz\n",
-            "    stepBaz --> workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFoo --> workflowFoo_stepFooNode{$statusCode == 200}\n",
+            "    workflowFoo_stepFooNode{$statusCode == 200} -->|true| workflowFoo_stepBar\n",
+            "    workflowFoo_stepFooNode{$statusCode == 200} -->|false| workflowFoo_stepBaz\n",
+            "    workflowFoo_stepBar --> workflowFoo_stepBaz\n",
+            "    workflowFoo_stepBaz --> workflowFooEndNode((End))\n",
             "    end\n",
         );
 
@@ -830,10 +863,10 @@ mod tests {
             "---\n",
             "flowchart TD\n",
             "    subgraph workflowFoo\n",
-            "    stepFoo --> stepFooNode{$statusCode == 200}\n",
-            "    stepFooNode{$statusCode == 200} -->|true| stepBar\n",
-            "    stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
-            "    stepBar --> workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFoo --> workflowFoo_stepFooNode{$statusCode == 200}\n",
+            "    workflowFoo_stepFooNode{$statusCode == 200} -->|true| workflowFoo_stepBar\n",
+            "    workflowFoo_stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
+            "    workflowFoo_stepBar --> workflowFooEndNode((End))\n",
             "    end\n",
         );
 
@@ -898,11 +931,11 @@ mod tests {
             "---\n",
             "flowchart TD\n",
             "    subgraph workflowFoo\n",
-            "    stepFoo --> stepFooNode\n",
-            "    stepFooNode -->|true| stepBar\n",
-            "    stepFooNode -->|false| stepBaz\n",
-            "    stepBar --> stepBaz\n",
-            "    stepBaz --> workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFoo --> workflowFoo_stepFooNode\n",
+            "    workflowFoo_stepFooNode -->|true| workflowFoo_stepBar\n",
+            "    workflowFoo_stepFooNode -->|false| workflowFoo_stepBaz\n",
+            "    workflowFoo_stepBar --> workflowFoo_stepBaz\n",
+            "    workflowFoo_stepBaz --> workflowFooEndNode((End))\n",
             "    end\n",
         );
 
@@ -954,10 +987,10 @@ mod tests {
             "---\n",
             "flowchart TD\n",
             "    subgraph workflowFoo\n",
-            "    stepFoo --> stepFooNode\n",
-            "    stepFooNode -->|true| stepBar\n",
-            "    stepFooNode -->|false| workflowFooEndNode((End))\n",
-            "    stepBar --> workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFoo --> workflowFoo_stepFooNode\n",
+            "    workflowFoo_stepFooNode -->|true| workflowFoo_stepBar\n",
+            "    workflowFoo_stepFooNode -->|false| workflowFooEndNode((End))\n",
+            "    workflowFoo_stepBar --> workflowFooEndNode((End))\n",
             "    end\n",
         );
 
@@ -1016,11 +1049,11 @@ mod tests {
             "---\n",
             "flowchart TD\n",
             "    subgraph workflowFoo\n",
-            "    stepFoo --> stepFooNode\n",
-            "    stepFooNode -->|true| stepBar\n",
-            "    stepFooNode -->|false| stepBaz\n",
-            "    stepBar --> stepBaz\n",
-            "    stepBaz --> workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFoo --> workflowFoo_stepFooNode\n",
+            "    workflowFoo_stepFooNode -->|true| workflowFoo_stepBar\n",
+            "    workflowFoo_stepFooNode -->|false| workflowFoo_stepBaz\n",
+            "    workflowFoo_stepBar --> workflowFoo_stepBaz\n",
+            "    workflowFoo_stepBaz --> workflowFooEndNode((End))\n",
             "    end\n",
         );
 
@@ -1066,8 +1099,8 @@ mod tests {
             "---\n",
             "flowchart TD\n",
             "    subgraph workflowFoo\n",
-            "    stepFoo --> stepBar\n",
-            "    stepBar --> workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFoo --> workflowFoo_stepBar\n",
+            "    workflowFoo_stepBar --> workflowFooEndNode((End))\n",
             "    end\n",
         );
 
@@ -1120,10 +1153,10 @@ mod tests {
             "---\n",
             "flowchart TD\n",
             "    subgraph workflowFoo\n",
-            "    stepFoo --> stepFooNode{$statusCode == 200 && $response.body.status == done}\n",
-            "    stepFooNode{$statusCode == 200 && $response.body.status == done} -->|true| stepBar\n",
-            "    stepFooNode{$statusCode == 200 && $response.body.status == done} -->|false| workflowFooEndNode((End))\n",
-            "    stepBar --> workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFoo --> workflowFoo_stepFooNode{$statusCode == 200 && $response.body.status == done}\n",
+            "    workflowFoo_stepFooNode{$statusCode == 200 && $response.body.status == done} -->|true| workflowFoo_stepBar\n",
+            "    workflowFoo_stepFooNode{$statusCode == 200 && $response.body.status == done} -->|false| workflowFooEndNode((End))\n",
+            "    workflowFoo_stepBar --> workflowFooEndNode((End))\n",
             "    end\n",
         );
 
@@ -1169,10 +1202,10 @@ mod tests {
             "---\n",
             "flowchart TD\n",
             "    subgraph workflowFoo\n",
-            "    stepFoo --> stepFooNode\n",
-            "    stepFooNode -->|true| stepBar\n",
-            "    stepFooNode -->|false| workflowFooEndNode((End))\n",
-            "    stepBar --> workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFoo --> workflowFoo_stepFooNode\n",
+            "    workflowFoo_stepFooNode -->|true| workflowFoo_stepBar\n",
+            "    workflowFoo_stepFooNode -->|false| workflowFooEndNode((End))\n",
+            "    workflowFoo_stepBar --> workflowFooEndNode((End))\n",
             "    end\n",
         );
 
@@ -1217,9 +1250,9 @@ mod tests {
             "---\n",
             "flowchart TD\n",
             "    subgraph workflowFoo\n",
-            "    stepFoo --> stepFooNode{$statusCode == 200}\n",
-            "    stepFooNode{$statusCode == 200} -->|true| workflowFooEndNode((End))\n",
-            "    stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFoo --> workflowFoo_stepFooNode{$statusCode == 200}\n",
+            "    workflowFoo_stepFooNode{$statusCode == 200} -->|true| workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
             "    end\n",
         );
 
@@ -1258,9 +1291,9 @@ mod tests {
             "---\n",
             "flowchart TD\n",
             "    subgraph workflowFoo\n",
-            "    stepFoo --> stepFooNode{$statusCode == 200}\n",
-            "    stepFooNode{$statusCode == 200} -->|true| workflowFooEndNode((End))\n",
-            "    stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFoo --> workflowFoo_stepFooNode{$statusCode == 200}\n",
+            "    workflowFoo_stepFooNode{$statusCode == 200} -->|true| workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
             "    end\n",
         );
 
@@ -1333,15 +1366,15 @@ mod tests {
             "---\n",
             "flowchart TD\n",
             "    subgraph workflowFoo\n",
-            "    stepFoo --> stepFooNode{$statusCode == 200}\n",
-            "    stepFooNode{$statusCode == 200} -->|true| proceedToStepBarNode{$response.body.status == 'approved'}\n",
-            "    proceedToStepBarNode{$response.body.status == 'approved'} -->|true| stepBar\n",
-            "    proceedToStepBarNode{$response.body.status == 'approved'} -->|false| workflowFooEndNode((End))\n",
-            "    stepFooNode{$statusCode == 200} -->|false| doneNode{$response.body.error != null}\n",
-            "    doneNode{$response.body.error != null} -->|true| workflowFooEndNode((End))\n",
-            "    doneNode{$response.body.error != null} -->|false| workflowFooEndNode((End))\n",
-            "    stepBar --> stepBaz\n",
-            "    stepBaz --> workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFoo --> workflowFoo_stepFooNode{$statusCode == 200}\n",
+            "    workflowFoo_stepFooNode{$statusCode == 200} -->|true| workflowFoo_proceedToStepBarNode{$response.body.status == 'approved'}\n",
+            "    workflowFoo_proceedToStepBarNode{$response.body.status == 'approved'} -->|true| workflowFoo_stepBar\n",
+            "    workflowFoo_proceedToStepBarNode{$response.body.status == 'approved'} -->|false| workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFooNode{$statusCode == 200} -->|false| workflowFoo_doneNode{$response.body.error != null}\n",
+            "    workflowFoo_doneNode{$response.body.error != null} -->|true| workflowFooEndNode((End))\n",
+            "    workflowFoo_doneNode{$response.body.error != null} -->|false| workflowFooEndNode((End))\n",
+            "    workflowFoo_stepBar --> workflowFoo_stepBaz\n",
+            "    workflowFoo_stepBaz --> workflowFooEndNode((End))\n",
             "    end\n",
         );
 
@@ -1399,12 +1432,12 @@ mod tests {
             "---\n",
             "flowchart TD\n",
             "    subgraph workflowFoo\n",
-            "    stepFoo --> stepFooNode{$statusCode == 200}\n",
-            "    stepFooNode{$statusCode == 200} -->|true| proceedToStepBarNode{$response.body.status == 'approved'}\n",
-            "    proceedToStepBarNode{$response.body.status == 'approved'} -->|true| stepBar\n",
-            "    proceedToStepBarNode{$response.body.status == 'approved'} -->|false| workflowFooEndNode((End))\n",
-            "    stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
-            "    stepBar --> workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFoo --> workflowFoo_stepFooNode{$statusCode == 200}\n",
+            "    workflowFoo_stepFooNode{$statusCode == 200} -->|true| workflowFoo_proceedToStepBarNode{$response.body.status == 'approved'}\n",
+            "    workflowFoo_proceedToStepBarNode{$response.body.status == 'approved'} -->|true| workflowFoo_stepBar\n",
+            "    workflowFoo_proceedToStepBarNode{$response.body.status == 'approved'} -->|false| workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
+            "    workflowFoo_stepBar --> workflowFooEndNode((End))\n",
             "    end\n",
         );
 
@@ -1451,11 +1484,11 @@ mod tests {
             "---\n",
             "flowchart TD\n",
             "    subgraph workflowFoo\n",
-            "    stepFoo --> stepFooNode{$statusCode == 200}\n",
-            "    stepFooNode{$statusCode == 200} -->|true| doneNode{$response.body.status == 'approved'}\n",
-            "    doneNode{$response.body.status == 'approved'} -->|true| workflowFooEndNode((End))\n",
-            "    doneNode{$response.body.status == 'approved'} -->|false| workflowFooEndNode((End))\n",
-            "    stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFoo --> workflowFoo_stepFooNode{$statusCode == 200}\n",
+            "    workflowFoo_stepFooNode{$statusCode == 200} -->|true| workflowFoo_doneNode{$response.body.status == 'approved'}\n",
+            "    workflowFoo_doneNode{$response.body.status == 'approved'} -->|true| workflowFooEndNode((End))\n",
+            "    workflowFoo_doneNode{$response.body.status == 'approved'} -->|false| workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
             "    end\n",
         );
 
@@ -1513,12 +1546,12 @@ mod tests {
             "---\n",
             "flowchart TD\n",
             "    subgraph workflowFoo\n",
-            "    stepFoo --> stepFooNode{$statusCode == 200}\n",
-            "    stepFooNode{$statusCode == 200} -->|true| proceedToStepBarNode{$response.body.status == 'approved'}\n",
-            "    proceedToStepBarNode{$response.body.status == 'approved'} -->|true| stepBar\n",
-            "    proceedToStepBarNode{$response.body.status == 'approved'} -->|false| workflowFooEndNode((End))\n",
-            "    stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
-            "    stepBar --> workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFoo --> workflowFoo_stepFooNode{$statusCode == 200}\n",
+            "    workflowFoo_stepFooNode{$statusCode == 200} -->|true| workflowFoo_proceedToStepBarNode{$response.body.status == 'approved'}\n",
+            "    workflowFoo_proceedToStepBarNode{$response.body.status == 'approved'} -->|true| workflowFoo_stepBar\n",
+            "    workflowFoo_proceedToStepBarNode{$response.body.status == 'approved'} -->|false| workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
+            "    workflowFoo_stepBar --> workflowFooEndNode((End))\n",
             "    end\n",
         );
 
@@ -1574,12 +1607,12 @@ mod tests {
             "---\n",
             "flowchart TD\n",
             "    subgraph workflowFoo\n",
-            "    stepFoo --> stepFooNode{$statusCode == 200}\n",
-            "    stepFooNode{$statusCode == 200} -->|true| stepBar\n",
-            "    stepFooNode{$statusCode == 200} -->|false| proceedToStepBarNode{$response.body.error != null}\n",
-            "    proceedToStepBarNode{$response.body.error != null} -->|true| stepBar\n",
-            "    proceedToStepBarNode{$response.body.error != null} -->|false| workflowFooEndNode((End))\n",
-            "    stepBar --> workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFoo --> workflowFoo_stepFooNode{$statusCode == 200}\n",
+            "    workflowFoo_stepFooNode{$statusCode == 200} -->|true| workflowFoo_stepBar\n",
+            "    workflowFoo_stepFooNode{$statusCode == 200} -->|false| workflowFoo_proceedToStepBarNode{$response.body.error != null}\n",
+            "    workflowFoo_proceedToStepBarNode{$response.body.error != null} -->|true| workflowFoo_stepBar\n",
+            "    workflowFoo_proceedToStepBarNode{$response.body.error != null} -->|false| workflowFooEndNode((End))\n",
+            "    workflowFoo_stepBar --> workflowFooEndNode((End))\n",
             "    end\n",
         );
 
@@ -1633,12 +1666,12 @@ mod tests {
             "---\n",
             "flowchart TD\n",
             "    subgraph workflowFoo\n",
-            "    stepFoo --> stepFooNode{$statusCode == 200}\n",
-            "    stepFooNode{$statusCode == 200} -->|true| proceedToStepBarNode\n",
-            "    proceedToStepBarNode -->|true| stepBar\n",
-            "    proceedToStepBarNode -->|false| workflowFooEndNode((End))\n",
-            "    stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
-            "    stepBar --> workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFoo --> workflowFoo_stepFooNode{$statusCode == 200}\n",
+            "    workflowFoo_stepFooNode{$statusCode == 200} -->|true| workflowFoo_proceedToStepBarNode\n",
+            "    workflowFoo_proceedToStepBarNode -->|true| workflowFoo_stepBar\n",
+            "    workflowFoo_proceedToStepBarNode -->|false| workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFooNode{$statusCode == 200} -->|false| workflowFooEndNode((End))\n",
+            "    workflowFoo_stepBar --> workflowFooEndNode((End))\n",
             "    end\n",
         );
 
@@ -1699,12 +1732,12 @@ mod tests {
             "---\n",
             "flowchart TD\n",
             "    subgraph workflowFoo\n",
-            "    stepFoo --> stepFooNode\n",
-            "    stepFooNode -->|true| proceedToStepBarNode{$response.body.status == 'approved' && $response.body.error == null}\n",
-            "    proceedToStepBarNode{$response.body.status == 'approved' && $response.body.error == null} -->|true| stepBar\n",
-            "    proceedToStepBarNode{$response.body.status == 'approved' && $response.body.error == null} -->|false| workflowFooEndNode((End))\n",
-            "    stepFooNode -->|false| workflowFooEndNode((End))\n",
-            "    stepBar --> workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFoo --> workflowFoo_stepFooNode\n",
+            "    workflowFoo_stepFooNode -->|true| workflowFoo_proceedToStepBarNode{$response.body.status == 'approved' && $response.body.error == null}\n",
+            "    workflowFoo_proceedToStepBarNode{$response.body.status == 'approved' && $response.body.error == null} -->|true| workflowFoo_stepBar\n",
+            "    workflowFoo_proceedToStepBarNode{$response.body.status == 'approved' && $response.body.error == null} -->|false| workflowFooEndNode((End))\n",
+            "    workflowFoo_stepFooNode -->|false| workflowFooEndNode((End))\n",
+            "    workflowFoo_stepBar --> workflowFooEndNode((End))\n",
             "    end\n",
         );
 
@@ -1777,15 +1810,15 @@ mod tests {
             "---\n",
             "flowchart TD\n",
             "    subgraph workflowFoo\n",
-            "    stepFoo --> stepFooNode\n",
-            "    stepFooNode -->|true| workflowBar\n",
-            "    stepFooNode -->|false| workflowBaz\n",
+            "    workflowFoo_stepFoo --> workflowFoo_stepFooNode\n",
+            "    workflowFoo_stepFooNode -->|true| workflowBar\n",
+            "    workflowFoo_stepFooNode -->|false| workflowBaz\n",
             "    end\n",
             "    subgraph workflowBar\n",
-            "    stepFoo --> workflowBarEndNode((End))\n",
+            "    workflowBar_stepFoo --> workflowBarEndNode((End))\n",
             "    end\n",
             "    subgraph workflowBaz\n",
-            "    stepFoo --> workflowBazEndNode((End))\n",
+            "    workflowBaz_stepFoo --> workflowBazEndNode((End))\n",
             "    end\n",
         );
 
