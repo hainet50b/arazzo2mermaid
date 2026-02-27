@@ -1,9 +1,13 @@
 use std::error::Error;
 use std::fmt::{self, Display};
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 use std::{fs, process};
 
+use base64::prelude::*;
 use clap::Parser;
+use flate2::write::ZlibEncoder;
+use flate2::Compression;
+use serde::Serialize;
 
 use crate::renderer::{MermaidFlowchart, Renderer};
 
@@ -17,13 +21,17 @@ struct Arazzo2Mermaid {
     /// Arazzo workflows file to convert to Mermaid diagrams
     file: Option<String>,
 
-    /// Format to convert
+    /// Input file format to convert
     #[arg(short, long, value_name = "FORMAT", value_enum, default_value_t = Format::Yaml)]
     format: Format,
 
     /// Save to specified file
     #[arg(short, long, value_name = "FILE")]
     output: Option<String>,
+
+    /// Open in mermaid.live
+    #[arg(long, default_value_t = false)]
+    live: bool,
 }
 
 #[derive(clap::ValueEnum, Clone)]
@@ -37,6 +45,8 @@ enum Arazzo2MermaidError {
     Io(io::Error),
     Yaml(yaml_serde::Error),
     Json(serde_json::Error),
+    Deflate(io::Error),
+    Open(io::Error),
 }
 
 impl Display for Arazzo2MermaidError {
@@ -45,28 +55,20 @@ impl Display for Arazzo2MermaidError {
             Arazzo2MermaidError::Io(error) => write!(f, "Failed to read or write file: {}", error),
             Arazzo2MermaidError::Yaml(error) => write!(f, "Failed to parse YAML: {}", error),
             Arazzo2MermaidError::Json(error) => write!(f, "Failed to parse JSON: {}", error),
+            Arazzo2MermaidError::Deflate(error) => {
+                write!(f, "Failed to compress for mermaid.live: {}", error)
+            }
+            Arazzo2MermaidError::Open(error) => write!(f, "Failed to open browser: {}", error),
         }
     }
 }
 
 impl Error for Arazzo2MermaidError {}
 
-impl From<io::Error> for Arazzo2MermaidError {
-    fn from(error: io::Error) -> Self {
-        Arazzo2MermaidError::Io(error)
-    }
-}
-
-impl From<yaml_serde::Error> for Arazzo2MermaidError {
-    fn from(error: yaml_serde::Error) -> Self {
-        Arazzo2MermaidError::Yaml(error)
-    }
-}
-
-impl From<serde_json::Error> for Arazzo2MermaidError {
-    fn from(error: serde_json::Error) -> Self {
-        Arazzo2MermaidError::Json(error)
-    }
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MermaidLive {
+    code: String,
 }
 
 fn main() {
@@ -85,7 +87,42 @@ fn main() {
 
     match run(reader, &cli.format) {
         Ok(mermaid) => {
-            if let Some(file) = cli.output.as_deref() {
+            if cli.live {
+                let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
+
+                let mermaid_live = MermaidLive { code: mermaid };
+
+                match serde_json::to_string(&mermaid_live) {
+                    Ok(mermaid_live) => {
+                        if let Err(error) = encoder.write_all(mermaid_live.as_bytes()) {
+                            eprintln!("{}", Arazzo2MermaidError::Deflate(error));
+                            process::exit(1);
+                        };
+
+                        match encoder.finish() {
+                            Ok(compressed_bytes) => {
+                                let encoded = BASE64_URL_SAFE_NO_PAD.encode(compressed_bytes);
+
+                                if let Err(error) = open::that(format!(
+                                    "https://mermaid.live/edit#pako:{}",
+                                    encoded
+                                )) {
+                                    eprintln!("{}", Arazzo2MermaidError::Open(error));
+                                    process::exit(1);
+                                }
+                            }
+                            Err(error) => {
+                                eprintln!("{}", Arazzo2MermaidError::Deflate(error));
+                                process::exit(1);
+                            }
+                        }
+                    }
+                    Err(error) => {
+                        eprintln!("{}", Arazzo2MermaidError::Json(error));
+                        process::exit(1);
+                    }
+                }
+            } else if let Some(file) = cli.output.as_deref() {
                 if let Err(error) = fs::write(file, mermaid) {
                     eprintln!("{}", Arazzo2MermaidError::Io(error));
                     process::exit(1);
@@ -103,11 +140,13 @@ fn main() {
 
 fn run(mut reader: impl Read, format: &Format) -> Result<String, Arazzo2MermaidError> {
     let mut content = String::new();
-    reader.read_to_string(&mut content)?;
+    reader
+        .read_to_string(&mut content)
+        .map_err(Arazzo2MermaidError::Io)?;
 
     let arazzo = match format {
-        Format::Yaml => yaml_serde::from_str(&content)?,
-        Format::Json => serde_json::from_str(&content)?,
+        Format::Yaml => yaml_serde::from_str(&content).map_err(Arazzo2MermaidError::Yaml)?,
+        Format::Json => serde_json::from_str(&content).map_err(Arazzo2MermaidError::Json)?,
     };
     let mermaid = MermaidFlowchart.render(&arazzo);
 

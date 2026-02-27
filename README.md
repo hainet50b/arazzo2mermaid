@@ -15,6 +15,7 @@ The Arazzo ecosystem is still evolving, and dedicated visualization tools are li
 
 - Convert Arazzo workflows into Mermaid flowchart output
 - Support both YAML and JSON input formats
+- Open diagrams directly in mermaid.live
 - Lightweight single-binary CLI, also Docker-friendly
 
 ## Quick Start
@@ -66,6 +67,12 @@ Save to a file:
 
 ```sh
 arazzo2mermaid arazzo.yml -o docs/flowchart.mmd
+```
+
+Open in mermaid.live (overrides `-o` and standard output):
+
+```sh
+arazzo2mermaid arazzo.yml --live
 ```
 
 ## Conversion Rules
