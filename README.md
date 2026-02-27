@@ -1,5 +1,7 @@
 # arazzo2mermaid
 
+![Build](https://github.com/hainet50b/arazzo2mermaid/actions/workflows/build.yml/badge.svg)
+
 A lightweight Rust CLI tool that converts Arazzo workflows into Mermaid diagrams.
 
 ## Motivation
