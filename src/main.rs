@@ -5,7 +5,6 @@ use std::{fs, process};
 
 use clap::Parser;
 
-use crate::arazzo::ArazzoDocument;
 use crate::renderer::{MermaidFlowchart, Renderer};
 
 mod arazzo;
@@ -18,15 +17,26 @@ struct Arazzo2Mermaid {
     /// Arazzo workflows file to convert to Mermaid diagrams
     file: Option<String>,
 
+    /// Format to convert
+    #[arg(short, long, value_name = "FORMAT", value_enum, default_value_t = Format::Yaml)]
+    format: Format,
+
     /// Save to specified file
     #[arg(short, long, value_name = "FILE")]
     output: Option<String>,
+}
+
+#[derive(clap::ValueEnum, Clone)]
+enum Format {
+    Yaml,
+    Json,
 }
 
 #[derive(Debug)]
 enum Arazzo2MermaidError {
     Io(io::Error),
     Yaml(yaml_serde::Error),
+    Json(serde_json::Error),
 }
 
 impl Display for Arazzo2MermaidError {
@@ -34,6 +44,7 @@ impl Display for Arazzo2MermaidError {
         match self {
             Arazzo2MermaidError::Io(error) => write!(f, "Failed to read or write file: {}", error),
             Arazzo2MermaidError::Yaml(error) => write!(f, "Failed to parse YAML: {}", error),
+            Arazzo2MermaidError::Json(error) => write!(f, "Failed to parse JSON: {}", error),
         }
     }
 }
@@ -52,6 +63,12 @@ impl From<yaml_serde::Error> for Arazzo2MermaidError {
     }
 }
 
+impl From<serde_json::Error> for Arazzo2MermaidError {
+    fn from(error: serde_json::Error) -> Self {
+        Arazzo2MermaidError::Json(error)
+    }
+}
+
 fn main() {
     let cli = Arazzo2Mermaid::parse();
 
@@ -66,7 +83,7 @@ fn main() {
         },
     };
 
-    match run(reader) {
+    match run(reader, &cli.format) {
         Ok(mermaid) => {
             if let Some(file) = cli.output.as_deref() {
                 if let Err(error) = fs::write(file, mermaid) {
@@ -84,11 +101,14 @@ fn main() {
     };
 }
 
-fn run(mut reader: impl Read) -> Result<String, Arazzo2MermaidError> {
+fn run(mut reader: impl Read, format: &Format) -> Result<String, Arazzo2MermaidError> {
     let mut content = String::new();
     reader.read_to_string(&mut content)?;
 
-    let arazzo: ArazzoDocument = yaml_serde::from_str(&content)?;
+    let arazzo = match format {
+        Format::Yaml => yaml_serde::from_str(&content)?,
+        Format::Json => serde_json::from_str(&content)?,
+    };
     let mermaid = MermaidFlowchart.render(&arazzo);
 
     Ok(mermaid)
@@ -100,14 +120,7 @@ mod tests {
     use std::io::Cursor;
 
     #[test]
-    fn run_read_from_file() {
-        let reader = fs::File::open("fixtures/minimal.yml").unwrap();
-
-        run(reader).unwrap();
-    }
-
-    #[test]
-    fn run_read_from_stdin() {
+    fn run_read_stdin() {
         let mut reader = fs::File::open("fixtures/minimal.yml").unwrap();
 
         let mut content = String::new();
@@ -115,14 +128,37 @@ mod tests {
 
         let reader = Cursor::new(content);
 
-        run(reader).unwrap();
+        run(reader, &Format::Yaml).unwrap();
+    }
+
+    #[test]
+    fn run_read_yml_file() {
+        let reader = fs::File::open("fixtures/minimal.yml").unwrap();
+
+        run(reader, &Format::Yaml).unwrap();
     }
 
     #[test]
     fn run_read_invalid_yaml() {
         let reader = Cursor::new("invalid yaml");
 
-        let actual = run(reader).is_err();
+        let actual = run(reader, &Format::Yaml).is_err();
+
+        assert!(actual);
+    }
+
+    #[test]
+    fn run_read_json_file() {
+        let reader = fs::File::open("fixtures/minimal.json").unwrap();
+
+        run(reader, &Format::Json).unwrap();
+    }
+
+    #[test]
+    fn run_read_invalid_json() {
+        let reader = Cursor::new("invalid json");
+
+        let actual = run(reader, &Format::Json).is_err();
 
         assert!(actual);
     }

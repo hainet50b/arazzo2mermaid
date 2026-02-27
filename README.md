@@ -14,6 +14,7 @@ The Arazzo ecosystem is still evolving, and dedicated visualization tools are li
 ## Features
 
 - Convert Arazzo workflows into Mermaid flowchart output
+- Support both YAML and JSON input formats
 - Lightweight single-binary CLI, also Docker-friendly
 
 ## Quick Start
@@ -37,7 +38,7 @@ Prebuilt binaries may be provided in GitHub releases (initially Linux-only).
 
 ### Commands
 
-By default, it writes Mermaid text to standard output.
+By default, it reads YAML format and writes Mermaid text to standard output.
 
 ```sh
 arazzo2mermaid arazzo.yml
@@ -53,6 +54,12 @@ Or use `-` to explicitly specify stdin:
 
 ```sh
 arazzo2mermaid -
+```
+
+Convert from JSON format:
+
+```sh
+arazzo2mermaid --format json arazzo.json
 ```
 
 Save to a file:

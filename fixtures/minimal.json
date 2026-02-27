@@ -1,0 +1,16 @@
+{
+    "info": {
+        "title": "t"
+    },
+    "workflows": [
+        {
+            "workflowId": "w",
+            "steps": [
+                {
+                    "stepId": "s"
+                }
+            ]
+        }
+    ]
+}
+
