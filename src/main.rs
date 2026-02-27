@@ -79,8 +79,7 @@ fn main() {
         Some(file) => match fs::File::open(file) {
             Ok(file) => Box::new(file),
             Err(error) => {
-                eprintln!("{}", Arazzo2MermaidError::Io(error));
-                process::exit(1);
+                eprint_and_exit(Box::new(Arazzo2MermaidError::Io(error)));
             }
         },
     };
@@ -89,23 +88,25 @@ fn main() {
         Ok(mermaid) => {
             if cli.live {
                 if let Err(error) = open_mermaid_live(&mermaid) {
-                    eprintln!("{}", error);
-                    process::exit(1);
+                    eprint_and_exit(Box::new(error));
                 }
             } else if let Some(file) = cli.output.as_deref() {
                 if let Err(error) = fs::write(file, mermaid) {
-                    eprintln!("{}", Arazzo2MermaidError::Io(error));
-                    process::exit(1);
+                    eprint_and_exit(Box::new(Arazzo2MermaidError::Io(error)));
                 }
             } else {
                 print!("{}", mermaid);
             }
         }
         Err(error) => {
-            eprintln!("{}", error);
-            process::exit(1);
+            eprint_and_exit(Box::new(error));
         }
     };
+}
+
+fn eprint_and_exit(error: Box<dyn Error>) -> ! {
+    eprintln!("{}", error);
+    process::exit(1);
 }
 
 fn run(mut reader: impl Read, format: &Format) -> Result<String, Arazzo2MermaidError> {
