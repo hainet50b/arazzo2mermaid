@@ -5,9 +5,7 @@
 
 A lightweight Rust CLI tool that converts Arazzo workflows into Mermaid diagrams.
 
-## Overview
-
-`arazzo2mermaid` converts Arazzo workflows into Mermaid diagrams for documentation and visualization.
+## Motivation
 
 The Arazzo ecosystem is still evolving, and dedicated visualization tools are limited. This tool is intended as a bridge to connect Arazzo to the existing Mermaid ecosystem until more dedicated tooling matures.
 
@@ -37,7 +35,7 @@ docker run --rm \
 
 Prebuilt binaries may be provided in GitHub releases (initially Linux-only).
 
-### Commands
+## Commands
 
 By default, it reads YAML format and writes Mermaid text to standard output.
 
