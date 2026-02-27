@@ -1,8 +1,5 @@
 # arazzo2mermaid
 
-> ⚠️ This project is under active development.  
-> The CLI interface is subject to change until the first release.
-
 A lightweight Rust CLI tool that converts Arazzo workflows into Mermaid diagrams.
 
 ## Motivation
