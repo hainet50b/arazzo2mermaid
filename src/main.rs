@@ -88,39 +88,9 @@ fn main() {
     match run(reader, &cli.format) {
         Ok(mermaid) => {
             if cli.live {
-                let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
-
-                let mermaid_live = MermaidLive { code: mermaid };
-
-                match serde_json::to_string(&mermaid_live) {
-                    Ok(mermaid_live) => {
-                        if let Err(error) = encoder.write_all(mermaid_live.as_bytes()) {
-                            eprintln!("{}", Arazzo2MermaidError::Deflate(error));
-                            process::exit(1);
-                        };
-
-                        match encoder.finish() {
-                            Ok(compressed_bytes) => {
-                                let encoded = BASE64_URL_SAFE_NO_PAD.encode(compressed_bytes);
-
-                                if let Err(error) = open::that(format!(
-                                    "https://mermaid.live/edit#pako:{}",
-                                    encoded
-                                )) {
-                                    eprintln!("{}", Arazzo2MermaidError::Open(error));
-                                    process::exit(1);
-                                }
-                            }
-                            Err(error) => {
-                                eprintln!("{}", Arazzo2MermaidError::Deflate(error));
-                                process::exit(1);
-                            }
-                        }
-                    }
-                    Err(error) => {
-                        eprintln!("{}", Arazzo2MermaidError::Json(error));
-                        process::exit(1);
-                    }
+                if let Err(error) = open_mermaid_live(&mermaid) {
+                    eprintln!("{}", error);
+                    process::exit(1);
                 }
             } else if let Some(file) = cli.output.as_deref() {
                 if let Err(error) = fs::write(file, mermaid) {
@@ -151,6 +121,27 @@ fn run(mut reader: impl Read, format: &Format) -> Result<String, Arazzo2MermaidE
     let mermaid = MermaidFlowchart.render(&arazzo);
 
     Ok(mermaid)
+}
+
+fn open_mermaid_live(mermaid: &str) -> Result<(), Arazzo2MermaidError> {
+    let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
+
+    let mermaid_live = MermaidLive { code: mermaid.to_string() };
+    let mermaid_live = serde_json::to_string(&mermaid_live)
+        .map_err(Arazzo2MermaidError::Json)?;
+
+    encoder.write_all(mermaid_live.as_bytes())
+        .map_err(Arazzo2MermaidError::Deflate)?;
+
+    let compressed_bytes = encoder.finish()
+        .map_err(Arazzo2MermaidError::Deflate)?;
+
+    let encoded = BASE64_URL_SAFE_NO_PAD.encode(compressed_bytes);
+
+    open::that(format!("https://mermaid.live/edit#pako:{}", encoded))
+        .map_err(Arazzo2MermaidError::Open)?;
+
+    Ok(())
 }
 
 #[cfg(test)]
