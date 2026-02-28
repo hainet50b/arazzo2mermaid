@@ -18,12 +18,7 @@ The Arazzo ecosystem is still evolving, and dedicated visualization tools are li
 
 ## Quick Start
 
-### Run with Docker (Recommended)
-
-Docker is the recommended way to run this tool for the following reasons:
-
-- Infrequent usage patterns
-- The benefit of keeping local environments clean
+### Run with Docker
 
 ```sh
 docker container run --rm \
@@ -31,9 +26,11 @@ docker container run --rm \
   hainet50b/arazzo2mermaid arazzo.yml
 ```
 
+Note: The `--live` option is not available when running in Docker.
+
 ### Run with Binary
 
-Prebuilt binaries may be provided in GitHub releases (initially Linux-only).
+Download the prebuilt binary from [GitHub Releases](https://github.com/hainet50b/arazzo2mermaid/releases) (Linux-only).
 
 ## Commands
 
@@ -42,6 +39,8 @@ By default, it reads YAML format and writes Mermaid text to standard output.
 ```sh
 arazzo2mermaid arazzo.yml
 ```
+
+### Input options
 
 Read from standard input instead of a file:
 
@@ -61,13 +60,15 @@ Convert from JSON format:
 arazzo2mermaid --format json arazzo.json
 ```
 
+### Output options
+
 Save to a file:
 
 ```sh
 arazzo2mermaid arazzo.yml -o docs/flowchart.mmd
 ```
 
-Open in mermaid.live (overrides `-o` and standard output):
+Open in mermaid.live (overrides `-o` and standard output, binary only):
 
 ```sh
 arazzo2mermaid arazzo.yml --live
