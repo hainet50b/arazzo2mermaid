@@ -40,7 +40,7 @@ By default, it reads YAML format and writes Mermaid text to standard output.
 arazzo2mermaid arazzo.yml
 ```
 
-### Input options
+### Input Options
 
 Read from standard input instead of a file:
 
@@ -60,7 +60,7 @@ Convert from JSON format:
 arazzo2mermaid --format json arazzo.json
 ```
 
-### Output options
+### Output Options
 
 Save to a file:
 
@@ -76,10 +76,19 @@ arazzo2mermaid arazzo.yml --live
 
 ## Conversion Rules
 
-### Step connections
+The following rules are based on the [Arazzo Specification v1.0.1](https://spec.openapis.org/arazzo/v1.0.1.html).
 
-Steps are connected sequentially by default. When `onSuccess` or `onFailure` actions are defined, they override the
-default sequential flow.
+### Node Shapes
+
+| Shape                   | Meaning                                                   |
+|-------------------------|-----------------------------------------------------------|
+| Rectangle (`[label]`)   | A workflow step                                           |
+| Rhombus (`{condition}`) | A decision point based on `successCriteria` or `criteria` |
+| Circle (`((End))`)      | End of the workflow                                       |
+
+### Step Connections
+
+Steps are connected sequentially by default. When `onSuccess` or `onFailure` actions are defined, they override the default sequential flow.
 
 | successCriteria | onSuccess | onFailure | Rendering                                                                                                |
 |-----------------|-----------|-----------|----------------------------------------------------------------------------------------------------------|
@@ -92,22 +101,14 @@ default sequential flow.
 | Omitted         | Omitted   | Defined   | Rhombus node without condition label. `true` edge goes to the next step. `false` edge follows onFailure. |
 | Omitted         | Omitted   | Omitted   | Rectangle node connected to the next step, or End if it is the last step.                                |
 
-When `successCriteria` contains multiple criteria, their conditions are joined with `&&` and displayed as a single rhombus label.
+When `onSuccess` is omitted, the next sequential step is executed. When `onFailure` is omitted, the workflow breaks and returns (treated as End in the diagram). These defaults follow the [Arazzo Specification v1.0.1](https://spec.openapis.org/arazzo/v1.0.1.html).
 
-### Cross-workflow connections
+### Criteria
 
-When an action (such as `onSuccess`) specifies `workflowId` instead of `stepId`, the edge goes to the referenced workflow's subgraph node. `workflowId` and `stepId` are mutually exclusive per the Arazzo specification. If both are defined, `workflowId` takes precedence over `stepId`.
-
-### Node shapes
-
-| Shape                   | Meaning                                                   |
-|-------------------------|-----------------------------------------------------------|
-| Rectangle (`[label]`)   | A workflow step                                           |
-| Rhombus (`{condition}`) | A decision point based on `successCriteria` or `criteria` |
-| Circle (`((End))`)      | End of the workflow                                       |
-
-### Defaults from the Arazzo specification
-
-When `onSuccess` is omitted, the next sequential step is executed. When `onFailure` is omitted, the workflow breaks and returns (treated as End in the diagram). These defaults follow the [Arazzo Specification v1.0.1](https://spec.openapis.org/arazzo/latest.html).
+When `successCriteria` or `criteria` contains multiple criteria, their conditions are joined with `&&` and displayed as a single rhombus label.
 
 When an action (such as `onSuccess`) defines `criteria`, an additional rhombus node is inserted in the flow. The `true` edge proceeds to the action target, and the `false` edge goes to End. This behavior when not all criteria are met is not explicitly defined in the Arazzo specification.
+
+### Cross-Workflow Connections
+
+When an action (such as `onSuccess`) specifies `workflowId` instead of `stepId`, the edge goes to the referenced workflow's subgraph node. `workflowId` and `stepId` are mutually exclusive per the Arazzo specification. If both are defined, `workflowId` takes precedence over `stepId`.
