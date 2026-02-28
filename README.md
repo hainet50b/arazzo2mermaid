@@ -1,6 +1,7 @@
 # arazzo2mermaid
 
 ![Build](https://github.com/hainet50b/arazzo2mermaid/actions/workflows/build.yml/badge.svg)
+![Release](https://img.shields.io/github/v/release/hainet50b/arazzo2mermaid)
 
 A lightweight Rust CLI tool that converts [Arazzo](https://spec.openapis.org/arazzo/latest.html) workflows into [Mermaid](https://mermaid.js.org/) diagrams.
 
@@ -30,7 +31,7 @@ Note: The `--live` option is not available when running in Docker.
 
 ### Run with Binary
 
-Download the prebuilt binary from [GitHub Releases](https://github.com/hainet50b/arazzo2mermaid/releases) (Linux-only).
+Download the prebuilt binary from [GitHub Releases](https://github.com/hainet50b/arazzo2mermaid/releases).
 
 ## Commands
 
