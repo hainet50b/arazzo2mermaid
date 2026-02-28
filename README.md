@@ -12,6 +12,7 @@ The Arazzo ecosystem is still evolving, and dedicated visualization tools are li
 
 - Convert Arazzo workflows into Mermaid flowchart output
 - Support both YAML and JSON input formats
+- Write to standard output or save to a file
 - Open diagrams directly in mermaid.live
 - Lightweight single-binary CLI, also Docker-friendly
 
@@ -25,9 +26,9 @@ Docker is the recommended way to run this tool for the following reasons:
 - The benefit of keeping local environments clean
 
 ```sh
-docker run --rm \
-  -v $(pwd):/spec \
-  arazzo2mermaid arazzo.yml
+docker container run --rm \
+  -v "$PWD":/spec:ro \
+  hainet50b/arazzo2mermaid arazzo.yml
 ```
 
 ### Run with Binary
