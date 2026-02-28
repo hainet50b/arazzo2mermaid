@@ -1,0 +1,83 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            asset: arazzo2mermaid-linux-amd64
+            binary: arazzo2mermaid
+          - os: macos-latest
+            asset: arazzo2mermaid-darwin-arm64
+            binary: arazzo2mermaid
+          - os: windows-latest
+            asset: arazzo2mermaid-windows-amd64.exe
+            binary: arazzo2mermaid.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Rename binary
+        shell: bash
+        run: cp target/release/${{ matrix.binary }} ${{ matrix.asset }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create release
+        run: |
+          gh release create ${{ github.ref_name }} \
+            artifacts/* \
+            --title "${{ github.ref_name }}" \
+            --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Extract version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u hainet50b --password-stdin
+
+      - name: Build image
+        run: docker build -t hainet50b/arazzo2mermaid:${{ env.VERSION }} -t hainet50b/arazzo2mermaid:latest .
+
+      - name: Push image
+        run: |
+          docker push hainet50b/arazzo2mermaid:${{ env.VERSION }}
+          docker push hainet50b/arazzo2mermaid:latest
