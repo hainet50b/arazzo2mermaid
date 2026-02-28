@@ -1,9 +1,26 @@
 # Rust
-/target
+target/
 
 # IDEs
 .idea/
+.vscode
 
 # Claude Code
 .claude/
+.mcp.json
+
+# Sandbox artifacts
+.bash_profile
+.bashrc
+.profile
+.zprofile
+.zshrc
+.gitconfig
+.gitmodules
+.ripgreprc
+HEAD
+config
+hooks
+objects
+refs
 
