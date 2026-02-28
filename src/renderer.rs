@@ -20,14 +20,14 @@ impl Renderer for MermaidFlowchart {
             for (i, current_step) in workflow.steps.iter().enumerate() {
                 if should_branch(current_step) {
                     output.push_str(&to_rhombus_from_rectangle(
-                        &rectangle_node(
-                            &format!("{}_{}", workflow.workflow_id, current_step.step_id),
-                            &current_step.description,
-                        ),
-                        &rhombus_node(
-                            &format!("{}_{}", workflow.workflow_id, current_step.step_id),
-                            &current_step.success_criteria,
-                        ),
+                        &RectangleNode {
+                            node_name: format!("{}_{}", workflow.workflow_id, current_step.step_id).as_ref(),
+                            node_label: current_step.description.as_deref(),
+                        },
+                        &RhombusNode {
+                            node_name: format!("{}_{}", workflow.workflow_id, current_step.step_id).as_ref(),
+                            criteria: current_step.success_criteria.as_deref(),
+                        },
                     ));
 
                     if let Some(on_success) =
@@ -42,23 +42,25 @@ impl Renderer for MermaidFlowchart {
                         ));
                     } else if let Some(next_step) = &workflow.steps.get(i + 1) {
                         output.push_str(&to_rectangle_from_rhombus(
-                            &rhombus_node(
-                                &format!("{}_{}", workflow.workflow_id, current_step.step_id),
-                                &current_step.success_criteria,
-                            ),
-                            &rectangle_node(
-                                &format!("{}_{}", workflow.workflow_id, next_step.step_id),
-                                &next_step.description,
-                            ),
+                            &RhombusNode {
+                                node_name: format!("{}_{}", workflow.workflow_id, current_step.step_id).as_ref(),
+                                criteria: current_step.success_criteria.as_deref(),
+                            },
+                            &RectangleNode {
+                                node_name: format!("{}_{}", workflow.workflow_id, next_step.step_id).as_ref(),
+                                node_label: next_step.description.as_deref(),
+                            },
                             Verdict::Ok,
                         ));
                     } else {
                         output.push_str(&to_end_from_rhombus(
-                            &rhombus_node(
-                                &format!("{}_{}", workflow.workflow_id, current_step.step_id),
-                                &current_step.success_criteria,
-                            ),
-                            &end_node(&workflow.workflow_id),
+                            &RhombusNode {
+                                node_name: format!("{}_{}", workflow.workflow_id, current_step.step_id).as_ref(),
+                                criteria: current_step.success_criteria.as_deref(),
+                            },
+                            &EndNode {
+                                node_name: &workflow.workflow_id,
+                            },
                             Verdict::Ok,
                         ));
                     }
@@ -75,32 +77,36 @@ impl Renderer for MermaidFlowchart {
                         ));
                     } else {
                         output.push_str(&to_end_from_rhombus(
-                            &rhombus_node(
-                                &format!("{}_{}", workflow.workflow_id, current_step.step_id),
-                                &current_step.success_criteria,
-                            ),
-                            &end_node(&workflow.workflow_id),
+                            &RhombusNode {
+                                node_name: format!("{}_{}", workflow.workflow_id, current_step.step_id).as_ref(),
+                                criteria: current_step.success_criteria.as_deref(),
+                            },
+                            &EndNode {
+                                node_name: &workflow.workflow_id,
+                            },
                             Verdict::Ng,
                         ));
                     }
                 } else if let Some(next_step) = &workflow.steps.get(i + 1) {
                     output.push_str(&to_rectangle_from_rectangle(
-                        &rectangle_node(
-                            &format!("{}_{}", workflow.workflow_id, current_step.step_id),
-                            &current_step.description,
-                        ),
-                        &rectangle_node(
-                            &format!("{}_{}", workflow.workflow_id, next_step.step_id),
-                            &next_step.description,
-                        ),
+                        &RectangleNode {
+                            node_name: format!("{}_{}", workflow.workflow_id, current_step.step_id).as_ref(),
+                            node_label: current_step.description.as_deref(),
+                        },
+                        &RectangleNode {
+                            node_name: format!("{}_{}", workflow.workflow_id, next_step.step_id).as_ref(),
+                            node_label: next_step.description.as_deref(),
+                        },
                     ));
                 } else {
                     output.push_str(&to_end_from_rectangle(
-                        &rectangle_node(
-                            &format!("{}_{}", workflow.workflow_id, current_step.step_id),
-                            &current_step.description,
-                        ),
-                        &end_node(&workflow.workflow_id),
+                        &RectangleNode {
+                            node_name: format!("{}_{}", workflow.workflow_id, current_step.step_id).as_ref(),
+                            node_label: current_step.description.as_deref(),
+                        },
+                        &EndNode {
+                            node_name: &workflow.workflow_id,
+                        },
                     ));
                 }
             }
@@ -121,17 +127,23 @@ fn render_action(
 ) -> String {
     let mut output = String::new();
 
-    let mut from_rhombus_node =
-        rhombus_node(&format!("{}_{}", workflow_id, step_id), success_criteria);
+    let node_name = format!("{}_{}", workflow_id, step_id);
+    let mut from_rhombus_node = RhombusNode {
+        node_name: node_name.as_ref(),
+        criteria: success_criteria.as_deref(),
+    };
     let mut verdict = match action_side {
         ActionSide::OnSuccess => Verdict::Ok,
         ActionSide::OnFailure => Verdict::Ng,
     };
     let has_criteria = action.criteria.is_some();
 
+    let node_name = format!("{}_{}", workflow_id, action.name);
     if has_criteria {
-        let to_rhombus_node =
-            rhombus_node(&format!("{}_{}", workflow_id, action.name), &action.criteria);
+        let to_rhombus_node = RhombusNode {
+            node_name: node_name.as_ref(),
+            criteria: action.criteria.as_deref(),
+        };
 
         output.push_str(&to_rhombus_from_rhombus(
             &from_rhombus_node,
@@ -148,13 +160,19 @@ fn render_action(
             if let Some(action_workflow_id) = action.workflow_id.as_deref() {
                 output.push_str(&to_rectangle_from_rhombus(
                     &from_rhombus_node,
-                    &rectangle_node(action_workflow_id, &None),
+                    &RectangleNode {
+                        node_name: action_workflow_id,
+                        node_label: None,
+                    },
                     verdict,
                 ));
             } else if let Some(action_step_id) = action.step_id.as_deref() {
                 output.push_str(&to_rectangle_from_rhombus(
                     &from_rhombus_node,
-                    &rectangle_node(&format!("{}_{}", workflow_id, action_step_id), &None),
+                    &RectangleNode {
+                        node_name: format!("{}_{}", workflow_id, action_step_id).as_ref(),
+                        node_label: None,
+                    },
                     verdict,
                 ));
             }
@@ -162,7 +180,9 @@ fn render_action(
         ActionType::End => {
             output.push_str(&to_end_from_rhombus(
                 &from_rhombus_node,
-                &end_node(workflow_id),
+                &EndNode {
+                    node_name: workflow_id,
+                },
                 verdict,
             ));
         }
@@ -171,7 +191,9 @@ fn render_action(
     if has_criteria {
         output.push_str(&to_end_from_rhombus(
             &from_rhombus_node,
-            &end_node(workflow_id),
+            &EndNode {
+                node_name: workflow_id,
+            },
             Verdict::Ng,
         ));
     }
@@ -199,19 +221,19 @@ fn subgraph_description(subgraph_description: Option<&str>) -> String {
     subgraph_description.map_or(String::new(), |v| format!("[\"{}\"]", v))
 }
 
-fn to_rectangle_from_rectangle(from: &str, to: &str) -> String {
+fn to_rectangle_from_rectangle(from: &RectangleNode, to: &RectangleNode) -> String {
     format!(
         "    {from_node} --> {to_node}\n",
-        from_node = from,
-        to_node = to,
+        from_node = from.to_mermaid(),
+        to_node = to.to_mermaid(),
     )
 }
 
-fn to_rectangle_from_rhombus(from: &str, to: &str, verdict: Verdict) -> String {
+fn to_rectangle_from_rhombus(from: &RhombusNode, to: &RectangleNode, verdict: Verdict) -> String {
     format!(
         "    {rhombus_node} -->|{verdict}| {rectangle_node}\n",
-        rhombus_node = from,
-        rectangle_node = to,
+        rhombus_node = from.to_mermaid(),
+        rectangle_node = to.to_mermaid(),
         verdict = match verdict {
             Verdict::Ok => "true",
             Verdict::Ng => "false",
@@ -219,19 +241,19 @@ fn to_rectangle_from_rhombus(from: &str, to: &str, verdict: Verdict) -> String {
     )
 }
 
-fn to_rhombus_from_rectangle(from: &str, to: &str) -> String {
+fn to_rhombus_from_rectangle(from: &RectangleNode, to: &RhombusNode) -> String {
     format!(
         "    {rectangle_node} --> {rhombus_node}\n",
-        rectangle_node = from,
-        rhombus_node = to,
+        rectangle_node = from.to_mermaid(),
+        rhombus_node = to.to_mermaid(),
     )
 }
 
-fn to_rhombus_from_rhombus(from: &str, to: &str, verdict: Verdict) -> String {
+fn to_rhombus_from_rhombus(from: &RhombusNode, to: &RhombusNode, verdict: Verdict) -> String {
     format!(
         "    {from_node} -->|{verdict}| {to_node}\n",
-        from_node = from,
-        to_node = to,
+        from_node = from.to_mermaid(),
+        to_node = to.to_mermaid(),
         verdict = match verdict {
             Verdict::Ok => "true",
             Verdict::Ng => "false",
@@ -239,19 +261,19 @@ fn to_rhombus_from_rhombus(from: &str, to: &str, verdict: Verdict) -> String {
     )
 }
 
-fn to_end_from_rectangle(from: &str, to: &str) -> String {
+fn to_end_from_rectangle(from: &RectangleNode, to: &EndNode) -> String {
     format!(
         "    {rectangle_node} --> {end_node}\n",
-        rectangle_node = from,
-        end_node = to,
+        rectangle_node = from.to_mermaid(),
+        end_node = to.to_mermaid(),
     )
 }
 
-fn to_end_from_rhombus(from: &str, to: &str, verdict: Verdict) -> String {
+fn to_end_from_rhombus(from: &RhombusNode, to: &EndNode, verdict: Verdict) -> String {
     format!(
         "    {rhombus_node} -->|{verdict}| {end_node}\n",
-        rhombus_node = from,
-        end_node = to,
+        rhombus_node = from.to_mermaid(),
+        end_node = to.to_mermaid(),
         verdict = match verdict {
             Verdict::Ok => "true",
             Verdict::Ng => "false",
@@ -271,27 +293,45 @@ enum ActionSide {
     OnFailure,
 }
 
-fn rectangle_node(node_name: &str, node_label: &Option<String>) -> String {
-    format!(
-        "{node_name}{node_label}",
-        node_label = rectangle_node_label(node_label),
-    )
+trait Node {
+    fn to_mermaid(&self) -> String;
 }
 
-fn rectangle_node_label(node_label: &Option<String>) -> String {
-    node_label
-        .as_deref()
-        .map_or(String::new(), |v| format!("[\"{}\"]", v))
+struct RectangleNode<'a> {
+    node_name: &'a str,
+    node_label: Option<&'a str>,
 }
 
-fn rhombus_node(node_name: &str, criteria: &Option<Vec<Criteria>>) -> String {
-    format!(
-        "{node_name}Node{condition}",
-        condition = rhombus_node_condition(criteria),
-    )
+impl<'a> Node for RectangleNode<'a> {
+    fn to_mermaid(&self) -> String {
+        format!(
+            "{node_name}{node_label}",
+            node_name = self.node_name,
+            node_label = rectangle_node_label(self.node_label),
+        )
+    }
 }
 
-fn rhombus_node_condition(criteria: &Option<Vec<Criteria>>) -> String {
+fn rectangle_node_label(node_label: Option<&str>) -> String {
+    node_label.map_or(String::new(), |v| format!("[\"{}\"]", v))
+}
+
+struct RhombusNode<'a> {
+    node_name: &'a str,
+    criteria: Option<&'a [Criteria]>,
+}
+
+impl<'a> Node for RhombusNode<'a> {
+    fn to_mermaid(&self) -> String {
+        format!(
+            "{node_name}Node{condition}",
+            node_name = self.node_name,
+            condition = rhombus_node_condition(&self.criteria),
+        )
+    }
+}
+
+fn rhombus_node_condition(criteria: &Option<&[Criteria]>) -> String {
     if let Some(criteria) = &criteria
         && !criteria.is_empty()
     {
@@ -311,8 +351,14 @@ fn rhombus_node_condition(criteria: &Option<Vec<Criteria>>) -> String {
     }
 }
 
-fn end_node(node_name: &str) -> String {
-    format!("{node_name}EndNode((End))")
+struct EndNode<'a> {
+    node_name: &'a str,
+}
+
+impl Node for EndNode<'_> {
+    fn to_mermaid(&self) -> String {
+        format!("{node_name}EndNode((End))", node_name = self.node_name)
+    }
 }
 
 #[cfg(test)]
