@@ -101,13 +101,13 @@ Steps are connected sequentially by default. When `onSuccess` or `onFailure` act
 | Omitted         | Omitted   | Defined   | Rhombus node without condition label. `true` edge goes to the next step. `false` edge follows onFailure. |
 | Omitted         | Omitted   | Omitted   | Rectangle node connected to the next step, or End if it is the last step.                                |
 
-When `onSuccess` is omitted, the next sequential step is executed. When `onFailure` is omitted, the workflow breaks and returns (treated as End in the diagram). These defaults follow the [Arazzo Specification v1.0.1](https://spec.openapis.org/arazzo/v1.0.1.html).
+When `onSuccess` is omitted, the next sequential step is executed. When `onFailure` is omitted, the workflow breaks and returns (treated as End in the diagram). These defaults follow the Arazzo specification.
 
 ### Criteria
 
-When `successCriteria` or `criteria` contains multiple criteria, their conditions are joined with `&&` and displayed as a single rhombus label.
-
-When an action (such as `onSuccess`) defines `criteria`, an additional rhombus node is inserted in the flow. The `true` edge proceeds to the action target, and the `false` edge goes to End. This behavior when not all criteria are met is not explicitly defined in the Arazzo specification.
+- When `successCriteria` or `criteria` contains multiple criteria, their conditions are joined with `&&` and displayed as a single rhombus label.
+- When an action (such as `onSuccess`) defines `criteria`, an additional rhombus node is inserted in the flow. The `true` edge proceeds to the action target, and the `false` edge goes to End. This behavior when not all criteria are met is not explicitly defined in the Arazzo specification.
+- When multiple actions are defined without `criteria`, only the first action is meaningful because an action without `criteria` matches unconditionally. This is valid per the Arazzo specification but semantically ambiguous, and this tool does not guarantee correct rendering for such cases.
 
 ### Cross-Workflow Connections
 
