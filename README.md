@@ -2,7 +2,7 @@
 
 ![Build](https://github.com/hainet50b/arazzo2mermaid/actions/workflows/build.yml/badge.svg)
 
-A lightweight Rust CLI tool that converts Arazzo workflows into Mermaid diagrams.
+A lightweight Rust CLI tool that converts [Arazzo](https://spec.openapis.org/arazzo/latest.html) workflows into [Mermaid](https://mermaid.js.org/) diagrams.
 
 ## Motivation
 
@@ -13,7 +13,7 @@ The Arazzo ecosystem is still evolving, and dedicated visualization tools are li
 - Convert Arazzo workflows into Mermaid flowchart output
 - Support both YAML and JSON input formats
 - Write to standard output or save to a file
-- Open diagrams directly in mermaid.live
+- Open diagrams directly in [mermaid.live](https://mermaid.live/)
 - Lightweight single-binary CLI, also Docker-friendly
 
 ## Quick Start
@@ -68,7 +68,7 @@ Save to a file:
 arazzo2mermaid arazzo.yml -o docs/flowchart.mmd
 ```
 
-Open in mermaid.live (overrides `-o` and standard output, binary only):
+Open in [mermaid.live](https://mermaid.live/) (overrides `-o` and standard output, binary only):
 
 ```sh
 arazzo2mermaid arazzo.yml --live
